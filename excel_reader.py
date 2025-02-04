@@ -13,7 +13,7 @@ def main():
         print('Excel file loaded successfully:')
         print(df)
     except Exception as e:
-        print('Error reading the Excel file111:', e)
+        print('Error reading the Excel file222:', e)
 
 
 if __name__ == '__main__':
