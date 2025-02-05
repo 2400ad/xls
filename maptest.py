@@ -3,60 +3,150 @@ import pandas as pd
 
 class ColumnMapper:
     def __init__(self):
-        self.send_info = None
-        self.recv_info = None
+        self.send_connection = None
+        self.recv_connection = None
+        self.send_mapping = []  # 사용자가 입력한 송신 컬럼 순서
+        self.recv_mapping = []  # 사용자가 입력한 수신 컬럼 순서
+        self.send_columns = {}  # DB에서 가져온 송신 컬럼 정보 (key: 컬럼명)
+        self.recv_columns = {}  # DB에서 가져온 수신 컬럼 정보 (key: 컬럼명)
         self.send_table_info = None
         self.recv_table_info = None
         self.comparison_results = []
 
     def connect_db(self, sid, username, password):
-        """DB 연결"""
+        """DB 연결을 생성합니다."""
         return oracledb.connect(user=username, password=password, dsn=sid)
 
-    def get_column_info(self, connection, owner, table_name):
-        """테이블의 컬럼 정보 조회"""
+    def connect_send_db(self, sid, username, password):
+        """송신 DB에 연결합니다."""
+        self.send_connection = self.connect_db(sid, username, password)
+        return self.send_connection
+
+    def connect_recv_db(self, sid, username, password):
+        """수신 DB에 연결합니다."""
+        self.recv_connection = self.connect_db(sid, username, password)
+        return self.recv_connection
+
+    def close_connections(self):
+        """모든 DB 연결을 종료합니다."""
+        if self.send_connection:
+            try:
+                self.send_connection.close()
+            except:
+                pass
+        if self.recv_connection:
+            try:
+                self.recv_connection.close()
+            except:
+                pass
+
+    def get_column_info(self, owner, table_name, connection):
+        """테이블의 컬럼 정보를 조회합니다."""
+        cursor = connection.cursor()
         query = """
-        SELECT column_name as name, 
-               data_type as type,
-               data_length as size,
-               nullable
-        FROM all_tab_columns 
-        WHERE owner = :owner 
-        AND table_name = :table_name
-        ORDER BY column_id
+            SELECT column_name, data_type, data_length, nullable
+            FROM all_tab_columns
+            WHERE owner = :owner
+            AND table_name = :table_name
+            ORDER BY column_id
         """
-        with connection.cursor() as cursor:
-            cursor.execute(query, {'owner': owner, 'table_name': table_name})
-            columns = cursor.fetchall()
-            return [dict(zip([d[0].lower() for d in cursor.description], row)) for row in columns]
+        cursor.execute(query, owner=owner, table_name=table_name)
+        columns = {}
+        for row in cursor:
+            columns[row[0]] = {
+                'name': row[0],
+                'type': row[1],
+                'size': str(row[2]),
+                'nullable': 'Y' if row[3] == 'Y' else 'N'
+            }
+        cursor.close()
+        return columns
 
-    def set_send_table(self, owner, table_name, connection):
-        """송신 테이블 설정"""
+    def set_send_mapping(self, column_list):
+        """송신 매핑 컬럼을 설정합니다."""
+        self.send_mapping = [col.strip() for col in column_list.split('\n') if col.strip()]
+
+    def set_recv_mapping(self, column_list):
+        """수신 매핑 컬럼을 설정합니다."""
+        self.recv_mapping = [col.strip() for col in column_list.split('\n') if col.strip()]
+
+    def set_send_table(self, owner, table_name):
+        """송신 테이블 정보를 설정합니다."""
+        if not self.send_connection:
+            raise Exception("송신 DB 연결이 필요합니다.")
         self.send_table_info = {'owner': owner, 'table_name': table_name}
-        self.send_info = self.get_column_info(connection, owner, table_name)
-        return self.send_info
+        self.send_columns = self.get_column_info(owner, table_name, self.send_connection)
+        return self.send_columns
 
-    def set_recv_table(self, owner, table_name, connection):
-        """수신 테이블 설정"""
+    def set_recv_table(self, owner, table_name):
+        """수신 테이블 정보를 설정합니다."""
+        if not self.recv_connection:
+            raise Exception("수신 DB 연결이 필요합니다.")
         self.recv_table_info = {'owner': owner, 'table_name': table_name}
-        self.recv_info = self.get_column_info(connection, owner, table_name)
-        return self.recv_info
+        self.recv_columns = self.get_column_info(owner, table_name, self.recv_connection)
+        return self.recv_columns
 
     def compare_columns(self):
         """송수신 컬럼 비교"""
-        if not self.send_info or not self.recv_info:
+        if not self.send_mapping or not self.recv_mapping:
+            return "송신 또는 수신 매핑 정보가 설정되지 않았습니다."
+        if not self.send_columns or not self.recv_columns:
             return "송신 또는 수신 테이블 정보가 설정되지 않았습니다."
 
         self.comparison_results = []
-        for send, recv in zip(self.send_info, self.recv_info):
+        send_idx = 0
+        recv_idx = 0
+        
+        while send_idx < len(self.send_mapping) and recv_idx < len(self.recv_mapping):
+            send_col = self.send_mapping[send_idx]
+            recv_col = self.recv_mapping[recv_idx]
+            
+            # 수신 컬럼이 비어있으면 다음 수신 컬럼으로
+            if not recv_col:
+                recv_idx += 1
+                continue
+                
+            # 송신 컬럼이 비어있으면 다음 송신 컬럼으로
+            if not send_col:
+                send_idx += 1
+                continue
+
+            if send_col not in self.send_columns:
+                self.comparison_results.append({
+                    'send_column': send_col,
+                    'recv_column': recv_col,
+                    'error': f"송신 테이블에 {send_col} 컬럼이 존재하지 않습니다."
+                })
+                send_idx += 1
+                recv_idx += 1
+                continue
+
+            if recv_col not in self.recv_columns:
+                self.comparison_results.append({
+                    'send_column': send_col,
+                    'recv_column': recv_col,
+                    'error': f"수신 테이블에 {recv_col} 컬럼이 존재하지 않습니다."
+                })
+                send_idx += 1
+                recv_idx += 1
+                continue
+
+            send_info = self.send_columns[send_col]
+            recv_info = self.recv_columns[recv_col]
+
             result = {
-                'column_name': send['name'],
-                'type_diff': self.check_type_diff(send, recv),
-                'size_diff': self.check_size_diff(send, recv),
-                'size_over': self.check_size_over_1024(send),
-                'nullable_diff': self.check_nullable_diff(send, recv)
+                'send_column': send_col,
+                'recv_column': recv_col,
+                'type_diff': self.check_type_diff(send_info, recv_info),
+                'size_diff': self.check_size_diff(send_info, recv_info),
+                'size_over': self.check_size_over_1024(send_info),
+                'nullable_diff': self.check_nullable_diff(send_info, recv_info)
             }
             self.comparison_results.append(result)
+            
+            send_idx += 1
+            recv_idx += 1
+
         return self.comparison_results
 
     def check_type_diff(self, send, recv):
@@ -104,28 +194,29 @@ class ColumnMapper:
 
     def generate_send_sql(self):
         """송신 SQL 생성"""
-        if not self.send_info or not self.send_table_info:
+        if not self.send_mapping or not self.send_table_info:
             return "송신 테이블 정보가 설정되지 않았습니다."
-        return generate_full_send_sql(self.send_table_info, self.send_info)
+        return generate_full_send_sql(self.send_table_info, self.send_mapping, self.send_columns)
 
     def generate_recv_sql(self):
         """수신 SQL 생성"""
-        if not self.recv_info or not self.recv_table_info:
+        if not self.recv_mapping or not self.recv_table_info:
             return "수신 테이블 정보가 설정되지 않았습니다."
-        return generate_full_receive_sql(self.recv_table_info, self.recv_info)
+        return generate_full_receive_sql(self.recv_table_info, self.recv_mapping, self.recv_columns)
 
     def generate_field_xml(self):
         """필드 XML 생성"""
-        if not self.send_info:
+        if not self.send_mapping:
             return "송신 테이블 정보가 설정되지 않았습니다."
-        xml = generate_field_xml(self.send_info)
+        xml = generate_field_xml(self.send_mapping, self.send_columns)
         return format_field_xml(xml)
 
-def generate_full_send_sql(table_info, columns_info):
+def generate_full_send_sql(table_info, column_list, columns_info):
     """전체 송신 SQL 생성 (SELECT 문 전체)
     Args:
         table_info: 테이블 정보 {'owner': 스키마명, 'table_name': 테이블명}
-        columns_info: 컬럼 정보 리스트
+        column_list: 컬럼 목록
+        columns_info: 컬럼 정보 딕셔너리
     
     Returns:
         완성된 SELECT 문
@@ -134,7 +225,7 @@ def generate_full_send_sql(table_info, columns_info):
     base_query = f"SELECT "
     
     # 컬럼 부분 생성
-    columns_part = generate_send_sql(columns_info, base_query)
+    columns_part = generate_send_sql(column_list, columns_info, base_query)
     
     # FROM 절 추가
     if table_info['owner']:
@@ -144,25 +235,30 @@ def generate_full_send_sql(table_info, columns_info):
     
     return f"{columns_part}{from_clause}"
 
-def generate_send_sql(columns_info, base_query):
+def generate_send_sql(column_list, columns_info, base_query):
     """송신 SQL 생성
     Args:
-        columns_info: 컬럼 정보 리스트 [{'name': 컬럼명, 'type': 데이터타입, ...}, ...]
+        column_list: 컬럼 목록
+        columns_info: 컬럼 정보 딕셔너리
         base_query: 기본 쿼리 ($D$3에 해당)
     
     Returns:
         생성된 SQL 문자열
     """
     # 컬럼 개수 체크
-    if not columns_info:
+    if not column_list:
         return "송수신 컬럼 개수가 틀립니다!! 확인해주세요."
     
     # 결과 리스트
     sql_parts = []
     
     # 일반 컬럼 처리
-    for col_info in columns_info:
-        col_name = col_info['name']
+    for col_name in column_list:
+        col_info = columns_info.get(col_name)
+        if not col_info:
+            sql_parts.append(col_name)
+            continue
+        
         col_type = col_info['type']
         
         # DATE 타입 처리
@@ -176,11 +272,12 @@ def generate_send_sql(columns_info, base_query):
     
     return f"{base_query}{columns_sql}"
 
-def generate_full_receive_sql(table_info, columns_info):
+def generate_full_receive_sql(table_info, column_list, columns_info):
     """전체 수신 INSERT 문 생성
     Args:
         table_info: 테이블 정보 {'owner': 스키마명, 'table_name': 테이블명}
-        columns_info: 컬럼 정보 리스트
+        column_list: 컬럼 목록
+        columns_info: 컬럼 정보 딕셔너리
     
     Returns:
         완성된 INSERT 문
@@ -192,45 +289,51 @@ def generate_full_receive_sql(table_info, columns_info):
     base_query += f"{table_info['table_name']} ("
     
     # INTO 절 생성
-    into_part = generate_receive_insert_into(columns_info, base_query)
+    into_part = generate_receive_insert_into(column_list, columns_info, base_query)
     
     # VALUES 절 생성
-    values_part = generate_receive_insert_values(columns_info, "VALUES (")
+    values_part = generate_receive_insert_values(column_list, columns_info, "VALUES (")
     
     return f"{into_part})\n{values_part})"
 
-def generate_receive_insert_into(columns_info, base_query):
+def generate_receive_insert_into(column_list, columns_info, base_query):
     """수신 INSERT 문의 INTO 부분 생성
     Args:
-        columns_info: 컬럼 정보 리스트
+        column_list: 컬럼 목록
+        columns_info: 컬럼 정보 딕셔너리
         base_query: 기본 쿼리 ($E$3에 해당)
     
     Returns:
         INTO 절 문자열
     """
-    if not columns_info:
+    if not column_list:
         return "송수신 컬럼 개수가 틀립니다!! 확인해주세요."
     
     # 일반 컬럼 처리
-    column_names = [col_info['name'] for col_info in columns_info]
+    column_names = [col_name for col_name in column_list if col_name in columns_info]
     return f"{base_query}{', '.join(column_names)}"
 
-def generate_receive_insert_values(columns_info, base_query):
+def generate_receive_insert_values(column_list, columns_info, base_query):
     """수신 INSERT 문의 VALUES 부분 생성
     Args:
-        columns_info: 컬럼 정보 리스트
+        column_list: 컬럼 목록
+        columns_info: 컬럼 정보 딕셔너리
         base_query: 기본 쿼리 ($E$3에 해당)
     
     Returns:
         VALUES 절 문자열
     """
-    if not columns_info:
+    if not column_list:
         return "송수신 컬럼 개수가 틀립니다!! 확인해주세요."
     
     # 일반 컬럼 처리
     value_parts = []
-    for col_info in columns_info:
-        col_name = col_info['name']
+    for col_name in column_list:
+        col_info = columns_info.get(col_name)
+        if not col_info:
+            value_parts.append(f":{col_name}")
+            continue
+        
         col_type = col_info['type']
         
         # DATE 타입 처리
@@ -241,16 +344,17 @@ def generate_receive_insert_values(columns_info, base_query):
     
     return f"{base_query}{','.join(value_parts)}"
 
-def generate_field_xml(columns_info):
+def generate_field_xml(column_list, columns_info):
     """필드 XML 생성
     Args:
-        columns_info: 컬럼 정보 리스트
+        column_list: 컬럼 목록
+        columns_info: 컬럼 정보 딕셔너리
     
     Returns:
         XML 문자열
     """
     # 필드 개수 계산 (field가 포함된 컬럼 수)
-    field_count = sum(1 for col in columns_info if 'field' in col.get('name', '').lower())
+    field_count = sum(1 for col_name in column_list if 'field' in col_name.lower())
     
     # XML 라인 리스트
     xml_lines = []
@@ -259,15 +363,16 @@ def generate_field_xml(columns_info):
     xml_lines.append(f'<fields count="{field_count}">')
     
     # 일반 필드 처리
-    for col_info in columns_info:
-        if not col_info['name']:  # 빈 컬럼 스킵
+    for col_name in column_list:
+        col_info = columns_info.get(col_name)
+        if not col_info:
             continue
             
         # 기본 속성
         attrs = {
             'key': '0',
             'nofetch': '0',
-            'name': col_info['name']
+            'name': col_name
         }
         
         # 타입별 추가 속성
@@ -332,10 +437,15 @@ def format_field_xml(xml_str):
 
 if __name__ == "__main__":
     # 테스트를 위한 DB 연결 정보
-    DB_INFO = {
-        'sid': 'your_sid',
-        'username': 'your_username',
-        'password': 'your_password'
+    SEND_DB_INFO = {
+        'sid': 'your_send_sid',
+        'username': 'your_send_username',
+        'password': 'your_send_password'
+    }
+    RECV_DB_INFO = {
+        'sid': 'your_recv_sid',
+        'username': 'your_recv_username',
+        'password': 'your_recv_password'
     }
     
     # 테스트를 위한 테이블 정보
@@ -352,35 +462,50 @@ if __name__ == "__main__":
         mapper = ColumnMapper()
         
         print("="*50)
-        print("1. 송신 테이블 컬럼 정보 조회")
+        print("1. 송신 DB 연결")
         print("="*50)
         try:
-            conn = mapper.connect_db(**DB_INFO)
-            send_cols = mapper.set_send_table(**SEND_TABLE, connection=conn)
+            mapper.connect_send_db(**SEND_DB_INFO)
+        except Exception as e:
+            print(f"송신 DB 연결 실패: {str(e)}")
+        
+        print("\n" + "="*50)
+        print("2. 수신 DB 연결")
+        print("="*50)
+        try:
+            mapper.connect_recv_db(**RECV_DB_INFO)
+        except Exception as e:
+            print(f"수신 DB 연결 실패: {str(e)}")
+        
+        print("\n" + "="*50)
+        print("3. 송신 테이블 컬럼 정보 조회")
+        print("="*50)
+        try:
+            send_cols = mapper.set_send_table(**SEND_TABLE)
             print("송신 컬럼 정보:")
-            for col in send_cols:
-                print(f"컬럼명: {col['name']}, 타입: {col['type']}, 크기: {col['size']}, Nullable: {col['nullable']}")
+            for col_name, col_info in send_cols.items():
+                print(f"컬럼명: {col_name}, 타입: {col_info['type']}, 크기: {col_info['size']}, Nullable: {col_info['nullable']}")
         except Exception as e:
             print(f"송신 테이블 조회 실패: {str(e)}")
         
         print("\n" + "="*50)
-        print("2. 수신 테이블 컬럼 정보 조회")
+        print("4. 수신 테이블 컬럼 정보 조회")
         print("="*50)
         try:
-            recv_cols = mapper.set_recv_table(**RECV_TABLE, connection=conn)
+            recv_cols = mapper.set_recv_table(**RECV_TABLE)
             print("수신 컬럼 정보:")
-            for col in recv_cols:
-                print(f"컬럼명: {col['name']}, 타입: {col['type']}, 크기: {col['size']}, Nullable: {col['nullable']}")
+            for col_name, col_info in recv_cols.items():
+                print(f"컬럼명: {col_name}, 타입: {col_info['type']}, 크기: {col_info['size']}, Nullable: {col_info['nullable']}")
         except Exception as e:
             print(f"수신 테이블 조회 실패: {str(e)}")
         
         print("\n" + "="*50)
-        print("3. 송수신 컬럼 비교")
+        print("5. 송수신 컬럼 비교")
         print("="*50)
         try:
             results = mapper.compare_columns()
             for result in results:
-                print(f"\n컬럼: {result['column_name']}")
+                print(f"\n컬럼: {result['send_column']}")
                 if result['type_diff']: print(f"타입 차이: {result['type_diff']}")
                 if result['size_diff']: print(f"크기 차이: {result['size_diff']}")
                 if result['size_over']: print(f"크기 초과: {result['size_over']}")
@@ -389,7 +514,7 @@ if __name__ == "__main__":
             print(f"컬럼 비교 실패: {str(e)}")
         
         print("\n" + "="*50)
-        print("4. 송신 SQL 생성")
+        print("6. 송신 SQL 생성")
         print("="*50)
         try:
             send_sql = mapper.generate_send_sql()
@@ -398,7 +523,7 @@ if __name__ == "__main__":
             print(f"송신 SQL 생성 실패: {str(e)}")
         
         print("\n" + "="*50)
-        print("5. 수신 SQL 생성")
+        print("7. 수신 SQL 생성")
         print("="*50)
         try:
             recv_sql = mapper.generate_recv_sql()
@@ -407,7 +532,7 @@ if __name__ == "__main__":
             print(f"수신 SQL 생성 실패: {str(e)}")
         
         print("\n" + "="*50)
-        print("6. 필드 XML 생성")
+        print("8. 필드 XML 생성")
         print("="*50)
         try:
             field_xml = mapper.generate_field_xml()
@@ -416,7 +541,7 @@ if __name__ == "__main__":
             print(f"필드 XML 생성 실패: {str(e)}")
         
         # DB 연결 종료
-        conn.close()
+        mapper.close_connections()
     
     # 테스트 실행
     run_test()
