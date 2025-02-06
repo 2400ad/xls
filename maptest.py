@@ -216,6 +216,10 @@ class ColumnMapper:
 
     def check_type_diff(self, send, recv):
         """타입 차이 체크"""
+        if not isinstance(send, dict) or not isinstance(recv, dict):
+            return "컬럼 정보 형식 오류"
+        if 'type' not in send or 'type' not in recv:
+            return "컬럼 타입 정보 누락"
         if send['type'] == recv['type']:
             return ""
         if (send['type'] in ["VARCHAR", "VARCHAR2", "CHAR"]) and (recv['type'] in ["VARCHAR", "VARCHAR2", "CHAR"]):
@@ -224,6 +228,10 @@ class ColumnMapper:
 
     def check_size_diff(self, send, recv):
         """사이즈 차이 체크"""
+        if not isinstance(send, dict) or not isinstance(recv, dict):
+            return "컬럼 정보 형식 오류"
+        if 'type' not in send or 'type' not in recv or 'size' not in send or 'size' not in recv:
+            return "컬럼 타입 또는 크기 정보 누락"
         if send['type'] in ["NVARCHAR", "NCHAR", "NVARCHAR2"] or recv['type'] in ["NVARCHAR", "NCHAR", "NVARCHAR2"]:
             return "NCHAR TYPE"
         if send['type'] in ["BLOB", "CLOB"] or recv['type'] in ["BLOB", "CLOB"]:
@@ -234,6 +242,10 @@ class ColumnMapper:
 
     def check_size_over_1024(self, col_info):
         """1024 바이트 초과 체크"""
+        if not isinstance(col_info, dict):
+            return "컬럼 정보 형식 오류"
+        if 'type' not in col_info or 'size' not in col_info:
+            return "컬럼 타입 또는 크기 정보 누락"
         if col_info['type'] in ["NVARCHAR", "NCHAR", "NVARCHAR2"]:
             if float(col_info['size']) > 1024 / 3:
                 return "칼럼 Size > 1024"
@@ -243,6 +255,11 @@ class ColumnMapper:
 
     def check_nullable_diff(self, send, recv):
         """Nullable 차이 체크"""
+        if not isinstance(send, dict) or not isinstance(recv, dict):
+            return "컬럼 정보 형식 오류"
+        if 'nullable' not in send or 'nullable' not in recv:
+            return "Nullable 정보 누락"
+            
         send_nullable = send['nullable']
         recv_nullable = recv['nullable']
         
