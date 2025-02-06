@@ -109,13 +109,12 @@ class ColumnMapper:
     def compare_columns(self):
         """송수신 컬럼 비교"""
         if not self.send_mapping:
-            return "송신 매핑 정보가 설정되지 않았습니다."
+            return [{"error": "송신 매핑 정보가 설정되지 않았습니다."}]
         if not self.send_columns:
-            return "송신 테이블 정보가 설정되지 않았습니다."
+            return [{"error": "송신 테이블 정보가 설정되지 않았습니다."}]
 
         self.comparison_results = []
         has_error = False
-        error_messages = []
 
         # 송신 컬럼 수와 수신 매핑 리스트 길이 맞추기
         recv_mapping = self.recv_mapping if self.recv_mapping else [""] * len(self.send_mapping)
@@ -195,34 +194,7 @@ class ColumnMapper:
 
             self.comparison_results.append(result)
 
-        # 전체 에러 메시지 구성
-        if has_error:
-            error_summary = ["컬럼 비교 결과 다음과 같은 차이점이 발견되었습니다:"]
-            error_summary.extend(error_messages)
-            
-            # 각 컬럼별 에러 메시지 추가
-            for result in self.comparison_results:
-                if result.get('errors'):  # 딕셔너리 안전 접근
-                    # 무시할 에러 메시지 목록
-                    ignore_messages = [
-                        "수신 매핑이 설정되지 않았습니다 (선택적 수신)",
-                    ]
-                    
-                    # 실제 에러만 필터링
-                    real_errors = [
-                        error for error in result['errors']
-                        if not any(ignore_msg in error for ignore_msg in ignore_messages)
-                    ]
-                    
-                    # 실제 에러가 있는 경우만 출력
-                    if real_errors:
-                        col_errors = f"\n[{result['send_column']} -> {result['recv_column'] or '(매핑 없음)'}]"
-                        col_errors += "\n  - " + "\n  - ".join(real_errors)
-                        error_summary.append(col_errors)
-            
-            return "\n".join(error_summary)
-        
-        return "모든 컬럼이 정상적으로 매핑되었습니다."
+        return self.comparison_results
 
     def check_type_diff(self, send, recv):
         """타입 차이 체크"""

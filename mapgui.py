@@ -111,25 +111,38 @@ class MapperGUI:
             
             # 결과 표시
             self.result_text.delete("1.0", tk.END)
-            if isinstance(results, str):
-                self.result_text.insert(tk.END, results)
+            
+            has_error = False
+            error_messages = ["컬럼 비교 결과:"]
+            
+            for result in results:
+                if 'error' in result:
+                    error_messages.append(f"\n{result['error']}")
+                    has_error = True
+                    continue
+                    
+                if result.get('errors'):
+                    # 무시할 에러 메시지 목록
+                    ignore_messages = [
+                        "수신 매핑이 설정되지 않았습니다 (선택적 수신)",
+                    ]
+                    
+                    # 실제 에러만 필터링
+                    real_errors = [
+                        error for error in result['errors']
+                        if not any(ignore_msg in error for ignore_msg in ignore_messages)
+                    ]
+                    
+                    # 실제 에러가 있는 경우만 출력
+                    if real_errors:
+                        error_messages.append(f"\n[{result['send_column']} -> {result['recv_column'] or '(매핑 없음)'}]")
+                        error_messages.append("  - " + "\n  - ".join(real_errors))
+                        has_error = True
+
+            if not has_error:
+                self.result_text.insert(tk.END, "모든 컬럼이 정상적으로 매핑되었습니다.")
             else:
-                for result in results:
-                    if 'error' in result:
-                        self.result_text.insert(tk.END, f"\n{result['error']}")
-                        continue
-                        
-                    self.result_text.insert(tk.END, f"\n송신 컬럼: {result['send_column']}")
-                    self.result_text.insert(tk.END, f"\n수신 컬럼: {result['recv_column']}")
-                    if result['type_diff']: 
-                        self.result_text.insert(tk.END, f"\n타입 차이: {result['type_diff']}")
-                    if result['size_diff']: 
-                        self.result_text.insert(tk.END, f"\n크기 차이: {result['size_diff']}")
-                    if result['size_over']: 
-                        self.result_text.insert(tk.END, f"\n크기 초과: {result['size_over']}")
-                    if result['nullable_diff']: 
-                        self.result_text.insert(tk.END, f"\n널 허용 차이: {result['nullable_diff']}")
-                    self.result_text.insert(tk.END, "\n" + "-"*50)
+                self.result_text.insert(tk.END, "\n".join(error_messages))
 
         except Exception as e:
             messagebox.showerror("오류", str(e))
