@@ -108,22 +108,22 @@ class ColumnMapper:
 
     def compare_columns(self):
         """송수신 컬럼 비교"""
-        if not self.send_mapping or not self.recv_mapping:
-            return "송신 또는 수신 매핑 정보가 설정되지 않았습니다."
-        if not self.send_columns or not self.recv_columns:
-            return "송신 또는 수신 테이블 정보가 설정되지 않았습니다."
+        if not self.send_mapping:
+            return "송신 매핑 정보가 설정되지 않았습니다."
+        if not self.send_columns:
+            return "송신 테이블 정보가 설정되지 않았습니다."
 
         self.comparison_results = []
         has_error = False
         error_messages = []
 
-        # 송수신 매핑 개수 비교
-        if len(self.send_mapping) != len(self.recv_mapping):
-            error_messages.append(f"송신 컬럼 개수({len(self.send_mapping)})와 수신 컬럼 개수({len(self.recv_mapping)})가 다릅니다.")
-            has_error = True
+        # 송신 컬럼 수와 수신 매핑 리스트 길이 맞추기
+        recv_mapping = self.recv_mapping if self.recv_mapping else [""] * len(self.send_mapping)
+        if len(recv_mapping) < len(self.send_mapping):
+            recv_mapping.extend([""] * (len(self.send_mapping) - len(recv_mapping)))
 
         # 모든 컬럼 비교 수행
-        for idx, (send_col, recv_col) in enumerate(zip(self.send_mapping, self.recv_mapping)):
+        for idx, (send_col, recv_col) in enumerate(zip(self.send_mapping, recv_mapping)):
             result = {
                 'send_column': send_col,
                 'recv_column': recv_col,
@@ -146,61 +146,68 @@ class ColumnMapper:
             else:
                 result['send_info'] = self.send_columns[send_col]
 
-            # 수신 컬럼 정보 확인
+            # 수신 컬럼이 비어있는 경우는 정상적인 상황으로 처리
             if not recv_col:
-                result['errors'].append("수신 컬럼이 비어있습니다.")
-                has_error = True
-            elif recv_col not in self.recv_columns:
-                result['errors'].append(f"수신 테이블에 {recv_col} 컬럼이 존재하지 않습니다.")
-                has_error = True
+                result['errors'].append("수신 매핑이 설정되지 않았습니다 (선택적 수신)")
             else:
-                result['recv_info'] = self.recv_columns[recv_col]
-
-            # 두 컬럼이 모두 존재하는 경우에만 상세 비교 수행
-            if result['send_info'] and result['recv_info']:
-                send_info = result['send_info']
-                recv_info = result['recv_info']
-                
-                # 타입 비교
-                type_diff = self.check_type_diff(send_info, recv_info)
-                if type_diff:
-                    result['type_diff'] = type_diff
-                    result['errors'].append(f"타입이 다릅니다: 송신({send_info['type']}) vs 수신({recv_info['type']})")
+                # 수신 컬럼이 있는 경우에만 컬럼 존재 여부와 상세 비교 수행
+                if not self.recv_columns:
+                    result['errors'].append("수신 테이블 정보가 설정되지 않았습니다.")
                     has_error = True
-                
-                # 크기 비교
-                size_diff = self.check_size_diff(send_info, recv_info)
-                if size_diff:
-                    result['size_diff'] = size_diff
-                    result['errors'].append(f"크기가 다릅니다: 송신({send_info['size']}) vs 수신({recv_info['size']})")
+                elif recv_col not in self.recv_columns:
+                    result['errors'].append(f"수신 테이블에 {recv_col} 컬럼이 존재하지 않습니다.")
                     has_error = True
-                
-                # 1024 바이트 초과 여부 확인
-                size_over = self.check_size_over_1024(send_info)
-                if size_over:
-                    result['size_over'] = size_over
-                    result['errors'].append("송신 컬럼 크기가 1024 바이트를 초과합니다.")
-                    has_error = True
-                
-                # Nullable 비교
-                nullable_diff = self.check_nullable_diff(send_info, recv_info)
-                if nullable_diff:
-                    result['nullable_diff'] = nullable_diff
-                    result['errors'].append(f"NULL 허용 여부가 다릅니다: 송신({send_info['nullable']}) vs 수신({recv_info['nullable']})")
-                    has_error = True
+                else:
+                    result['recv_info'] = self.recv_columns[recv_col]
+                    
+                    # 상세 비교는 송신과 수신 정보가 모두 있는 경우에만 수행
+                    if result['send_info'] and result['recv_info']:
+                        send_info = result['send_info']
+                        recv_info = result['recv_info']
+                        
+                        # 타입 비교
+                        type_diff = self.check_type_diff(send_info, recv_info)
+                        if type_diff:
+                            result['type_diff'] = type_diff
+                            result['errors'].append(f"타입이 다릅니다: 송신({send_info['type']}) vs 수신({recv_info['type']})")
+                            has_error = True
+                        
+                        # 크기 비교
+                        size_diff = self.check_size_diff(send_info, recv_info)
+                        if size_diff:
+                            result['size_diff'] = size_diff
+                            result['errors'].append(f"크기가 다릅니다: 송신({send_info['size']}) vs 수신({recv_info['size']})")
+                            has_error = True
+                        
+                        # 1024 바이트 초과 여부 확인
+                        size_over = self.check_size_over_1024(send_info)
+                        if size_over:
+                            result['size_over'] = size_over
+                            result['errors'].append("송신 컬럼 크기가 1024 바이트를 초과합니다.")
+                            has_error = True
+                        
+                        # Nullable 비교
+                        nullable_diff = self.check_nullable_diff(send_info, recv_info)
+                        if nullable_diff:
+                            result['nullable_diff'] = nullable_diff
+                            result['errors'].append(f"NULL 허용 여부가 다릅니다: 송신({send_info['nullable']}) vs 수신({recv_info['nullable']})")
+                            has_error = True
 
             self.comparison_results.append(result)
 
         # 전체 에러 메시지 구성
         if has_error:
             error_summary = ["컬럼 비교 결과 다음과 같은 차이점이 발견되었습니다:"]
-            error_summary.extend(error_messages)  # 전체 에러 메시지 (예: 컬럼 개수 불일치)
+            error_summary.extend(error_messages)
             
             # 각 컬럼별 에러 메시지 추가
             for result in self.comparison_results:
                 if result['errors']:
-                    col_errors = f"\n[{result['send_column']} -> {result['recv_column']}]"
-                    col_errors += "\n  - " + "\n  - ".join(result['errors'])
+                    col_errors = f"\n[{result['send_column']} -> {result['recv_column'] or '(매핑 없음)'}]"
+                    col_errors += "\n  - " + "\n  - ".join(error for error in result['errors'] 
+                                                        if not error.startswith("수신 매핑이 설정되지 않았습니다"))
+                    if col_errors.strip().endswith(']'):  # 에러 메시지가 없는 경우 제외
+                        continue
                     error_summary.append(col_errors)
             
             return "\n".join(error_summary)
