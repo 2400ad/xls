@@ -202,13 +202,23 @@ class ColumnMapper:
             
             # 각 컬럼별 에러 메시지 추가
             for result in self.comparison_results:
-                if result['errors']:
-                    col_errors = f"\n[{result['send_column']} -> {result['recv_column'] or '(매핑 없음)'}]"
-                    col_errors += "\n  - " + "\n  - ".join(error for error in result['errors'] 
-                                                        if not error.startswith("수신 매핑이 설정되지 않았습니다"))
-                    if col_errors.strip().endswith(']'):  # 에러 메시지가 없는 경우 제외
-                        continue
-                    error_summary.append(col_errors)
+                if result.get('errors'):  # 딕셔너리 안전 접근
+                    # 무시할 에러 메시지 목록
+                    ignore_messages = [
+                        "수신 매핑이 설정되지 않았습니다 (선택적 수신)",
+                    ]
+                    
+                    # 실제 에러만 필터링
+                    real_errors = [
+                        error for error in result['errors']
+                        if not any(ignore_msg in error for ignore_msg in ignore_messages)
+                    ]
+                    
+                    # 실제 에러가 있는 경우만 출력
+                    if real_errors:
+                        col_errors = f"\n[{result['send_column']} -> {result['recv_column'] or '(매핑 없음)'}]"
+                        col_errors += "\n  - " + "\n  - ".join(real_errors)
+                        error_summary.append(col_errors)
             
             return "\n".join(error_summary)
         
