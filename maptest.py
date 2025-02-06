@@ -12,6 +12,8 @@ class ColumnMapper:
         self.send_table_info = None
         self.recv_table_info = None
         self.comparison_results = []
+        self.send_mapping_str = '''''' # 송신 매핑 문자열
+        self.recv_mapping_str = '''''' # 수신 매핑 문자열
 
     def connect_db(self, sid, username, password):
         """DB 연결을 생성합니다."""
@@ -85,6 +87,24 @@ class ColumnMapper:
         self.recv_table_info = {'owner': owner, 'table_name': table_name}
         self.recv_columns = self.get_column_info(owner, table_name, self.recv_connection)
         return self.recv_columns
+
+    def convert_mapping_str_to_list(self, mapping_str=None, mapping_type='send'):
+        """매핑 문자열을 리스트로 변환합니다.
+        
+        Args:
+            mapping_str: 변환할 매핑 문자열. None인 경우 mapping_type에 따라 self.send_mapping_str 또는 self.recv_mapping_str 사용
+            mapping_type: 매핑 타입 ('send' 또는 'recv')
+            
+        Returns:
+            변환된 리스트
+        """
+        if mapping_str is None:
+            if mapping_type == 'send':
+                mapping_str = self.send_mapping_str
+            else:
+                mapping_str = self.recv_mapping_str
+            
+        return [col.strip() for col in mapping_str.split('\n') if col.strip()]
 
     def compare_columns(self):
         """송수신 컬럼 비교"""
