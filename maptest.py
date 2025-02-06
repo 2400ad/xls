@@ -114,60 +114,98 @@ class ColumnMapper:
             return "송신 또는 수신 테이블 정보가 설정되지 않았습니다."
 
         self.comparison_results = []
-        send_idx = 0
-        recv_idx = 0
-        
-        while send_idx < len(self.send_mapping) and recv_idx < len(self.recv_mapping):
-            send_col = self.send_mapping[send_idx]
-            recv_col = self.recv_mapping[recv_idx]
-            
-            # 수신 컬럼이 비어있으면 다음 수신 컬럼으로
-            if not recv_col:
-                recv_idx += 1
-                continue
-                
-            # 송신 컬럼이 비어있으면 다음 송신 컬럼으로
-            if not send_col:
-                send_idx += 1
-                continue
+        has_error = False
+        error_messages = []
 
-            if send_col not in self.send_columns:
-                self.comparison_results.append({
-                    'send_column': send_col,
-                    'recv_column': recv_col,
-                    'error': f"송신 테이블에 {send_col} 컬럼이 존재하지 않습니다."
-                })
-                send_idx += 1
-                recv_idx += 1
-                continue
+        # 송수신 매핑 개수 비교
+        if len(self.send_mapping) != len(self.recv_mapping):
+            error_messages.append(f"송신 컬럼 개수({len(self.send_mapping)})와 수신 컬럼 개수({len(self.recv_mapping)})가 다릅니다.")
+            has_error = True
 
-            if recv_col not in self.recv_columns:
-                self.comparison_results.append({
-                    'send_column': send_col,
-                    'recv_column': recv_col,
-                    'error': f"수신 테이블에 {recv_col} 컬럼이 존재하지 않습니다."
-                })
-                send_idx += 1
-                recv_idx += 1
-                continue
-
-            send_info = self.send_columns[send_col]
-            recv_info = self.recv_columns[recv_col]
-
+        # 모든 컬럼 비교 수행
+        for idx, (send_col, recv_col) in enumerate(zip(self.send_mapping, self.recv_mapping)):
             result = {
                 'send_column': send_col,
                 'recv_column': recv_col,
-                'type_diff': self.check_type_diff(send_info, recv_info),
-                'size_diff': self.check_size_diff(send_info, recv_info),
-                'size_over': self.check_size_over_1024(send_info),
-                'nullable_diff': self.check_nullable_diff(send_info, recv_info)
+                'send_info': None,
+                'recv_info': None,
+                'type_diff': None,
+                'size_diff': None,
+                'size_over': None,
+                'nullable_diff': None,
+                'errors': []
             }
-            self.comparison_results.append(result)
-            
-            send_idx += 1
-            recv_idx += 1
 
-        return self.comparison_results
+            # 송신 컬럼 정보 확인
+            if not send_col:
+                result['errors'].append("송신 컬럼이 비어있습니다.")
+                has_error = True
+            elif send_col not in self.send_columns:
+                result['errors'].append(f"송신 테이블에 {send_col} 컬럼이 존재하지 않습니다.")
+                has_error = True
+            else:
+                result['send_info'] = self.send_columns[send_col]
+
+            # 수신 컬럼 정보 확인
+            if not recv_col:
+                result['errors'].append("수신 컬럼이 비어있습니다.")
+                has_error = True
+            elif recv_col not in self.recv_columns:
+                result['errors'].append(f"수신 테이블에 {recv_col} 컬럼이 존재하지 않습니다.")
+                has_error = True
+            else:
+                result['recv_info'] = self.recv_columns[recv_col]
+
+            # 두 컬럼이 모두 존재하는 경우에만 상세 비교 수행
+            if result['send_info'] and result['recv_info']:
+                send_info = result['send_info']
+                recv_info = result['recv_info']
+                
+                # 타입 비교
+                type_diff = self.check_type_diff(send_info, recv_info)
+                if type_diff:
+                    result['type_diff'] = type_diff
+                    result['errors'].append(f"타입이 다릅니다: 송신({send_info['type']}) vs 수신({recv_info['type']})")
+                    has_error = True
+                
+                # 크기 비교
+                size_diff = self.check_size_diff(send_info, recv_info)
+                if size_diff:
+                    result['size_diff'] = size_diff
+                    result['errors'].append(f"크기가 다릅니다: 송신({send_info['size']}) vs 수신({recv_info['size']})")
+                    has_error = True
+                
+                # 1024 바이트 초과 여부 확인
+                size_over = self.check_size_over_1024(send_info)
+                if size_over:
+                    result['size_over'] = size_over
+                    result['errors'].append("송신 컬럼 크기가 1024 바이트를 초과합니다.")
+                    has_error = True
+                
+                # Nullable 비교
+                nullable_diff = self.check_nullable_diff(send_info, recv_info)
+                if nullable_diff:
+                    result['nullable_diff'] = nullable_diff
+                    result['errors'].append(f"NULL 허용 여부가 다릅니다: 송신({send_info['nullable']}) vs 수신({recv_info['nullable']})")
+                    has_error = True
+
+            self.comparison_results.append(result)
+
+        # 전체 에러 메시지 구성
+        if has_error:
+            error_summary = ["컬럼 비교 결과 다음과 같은 차이점이 발견되었습니다:"]
+            error_summary.extend(error_messages)  # 전체 에러 메시지 (예: 컬럼 개수 불일치)
+            
+            # 각 컬럼별 에러 메시지 추가
+            for result in self.comparison_results:
+                if result['errors']:
+                    col_errors = f"\n[{result['send_column']} -> {result['recv_column']}]"
+                    col_errors += "\n  - " + "\n  - ".join(result['errors'])
+                    error_summary.append(col_errors)
+            
+            return "\n".join(error_summary)
+        
+        return "모든 컬럼이 정상적으로 매핑되었습니다."
 
     def check_type_diff(self, send, recv):
         """타입 차이 체크"""
@@ -231,6 +269,84 @@ class ColumnMapper:
         xml = generate_field_xml(self.send_mapping, self.send_columns)
         return format_field_xml(xml)
 
+    def generate_receive_insert_into(self, column_list, columns_info, base_query):
+        """수신 INSERT 문의 INTO 부분 생성
+        Args:
+            column_list: 컬럼 목록
+            columns_info: 컬럼 정보 딕셔너리
+            base_query: 기본 쿼리 ($E$3에 해당)
+        
+        Returns:
+            INTO 절 문자열
+        """
+        # 필수 시스템 컬럼 추가 (항상 처음에 포함)
+        sql_parts = [
+            "EAI_SEQ_ID",
+            "DATA_INTERFACE_TYPE_CODE",
+            "EAI_INTERFACE_DATE",
+            "APPLICATION_TRANSFER_FLAG"
+        ]
+        
+        # 사용자가 지정한 컬럼들 추가
+        for col in column_list:
+            if not col:  # 빈 컬럼은 건너뜀
+                continue
+                
+            if col not in columns_info:
+                continue
+                
+            sql_parts.append(col)
+        
+        # 컬럼들을 쉼표로 구분하여 합침
+        columns_sql = ", ".join(sql_parts)
+        
+        # 기본 쿼리가 있으면 합치고, 없으면 컬럼 목록만 반환
+        if base_query:
+            return f"{base_query}{columns_sql}"
+        return columns_sql
+
+    def generate_receive_insert_values(self, column_list, columns_info, base_query):
+        """수신 INSERT 문의 VALUES 부분 생성
+        Args:
+            column_list: 컬럼 목록
+            columns_info: 컬럼 정보 딕셔너리
+            base_query: 기본 쿼리 ($E$3에 해당)
+        
+        Returns:
+            VALUES 절 문자열
+        """
+        # 필수 시스템 컬럼 값 추가 (항상 처음에 포함)
+        sql_parts = [
+            ":EAI_SEQ_ID",
+            ":DATA_INTERFACE_TYPE_CODE",
+            "SYSDATE",  # 하드코딩 값
+            "'N'"      # 하드코딩 값
+        ]
+        
+        # 사용자가 지정한 컬럼들의 값 추가
+        for col in column_list:
+            if not col:  # 빈 컬럼은 건너뜀
+                continue
+                
+            if col not in columns_info:
+                continue
+                
+            col_info = columns_info[col]
+            
+            # DATE 타입인 경우 TO_DATE 변환 추가
+            if col_info['type'] == 'DATE':
+                sql_parts.append(f"TO_DATE(:{col}, 'YYYYMMDDHH24MISS')")
+            else:
+                sql_parts.append(f":{col}")
+        
+        # 값들을 쉼표로 구분하여 합침
+        values_sql = ", ".join(sql_parts)
+        
+        # 기본 쿼리가 있으면 합치고, 없으면 값 목록만 반환
+        if base_query:
+            return f"{base_query}{values_sql}"
+        return values_sql
+
 def generate_full_send_sql(table_info, column_list, columns_info):
     """전체 송신 SQL 생성 (SELECT 문 전체)
     Args:
@@ -265,32 +381,31 @@ def generate_send_sql(column_list, columns_info, base_query):
     Returns:
         생성된 SQL 문자열
     """
-    # 컬럼 개수 체크
-    if not column_list:
-        return "송수신 컬럼 개수가 틀립니다!! 확인해주세요."
+    # 필수 시스템 컬럼 추가 (항상 처음에 포함)
+    sql_parts = ["EAI_SEQ_ID", "DATA_INTERFACE_TYPE_CODE"]
     
-    # 결과 리스트
-    sql_parts = []
-    
-    # 일반 컬럼 처리
-    for col_name in column_list:
-        col_info = columns_info.get(col_name)
-        if not col_info:
-            sql_parts.append(col_name)
+    # 사용자가 지정한 컬럼들 추가
+    for col in column_list:
+        if not col:  # 빈 컬럼은 건너뜀
             continue
-        
-        col_type = col_info['type']
-        
-        # DATE 타입 처리
-        if col_type == "DATE":
-            sql_parts.append(f"TO_CHAR({col_name},'YYYYMMDDHH24MISS')")
+            
+        if col not in columns_info:
+            continue
+            
+        col_info = columns_info[col]
+        # DATE 타입인 경우 TO_CHAR 변환 추가
+        if col_info['type'] == 'DATE':
+            sql_parts.append(f"TO_CHAR({col}, 'YYYYMMDDHH24MISS')")
         else:
-            sql_parts.append(col_name)
+            sql_parts.append(col)
     
-    # 컬럼들을 콤마로 연결
-    columns_sql = ','.join(sql_parts)
+    # 컬럼들을 쉼표로 구분하여 합침
+    columns_sql = ", ".join(sql_parts)
     
-    return f"{base_query}{columns_sql}"
+    # 기본 쿼리가 있으면 합치고, 없으면 컬럼 목록만 반환
+    if base_query:
+        return f"{base_query}{columns_sql}"
+    return columns_sql
 
 def generate_full_receive_sql(table_info, column_list, columns_info):
     """전체 수신 INSERT 문 생성
@@ -309,60 +424,12 @@ def generate_full_receive_sql(table_info, column_list, columns_info):
     base_query += f"{table_info['table_name']} ("
     
     # INTO 절 생성
-    into_part = generate_receive_insert_into(column_list, columns_info, base_query)
+    into_part = ColumnMapper().generate_receive_insert_into(column_list, columns_info, base_query)
     
     # VALUES 절 생성
-    values_part = generate_receive_insert_values(column_list, columns_info, "VALUES (")
+    values_part = ColumnMapper().generate_receive_insert_values(column_list, columns_info, "VALUES (")
     
     return f"{into_part})\n{values_part})"
-
-def generate_receive_insert_into(column_list, columns_info, base_query):
-    """수신 INSERT 문의 INTO 부분 생성
-    Args:
-        column_list: 컬럼 목록
-        columns_info: 컬럼 정보 딕셔너리
-        base_query: 기본 쿼리 ($E$3에 해당)
-    
-    Returns:
-        INTO 절 문자열
-    """
-    if not column_list:
-        return "송수신 컬럼 개수가 틀립니다!! 확인해주세요."
-    
-    # 일반 컬럼 처리
-    column_names = [col_name for col_name in column_list if col_name in columns_info]
-    return f"{base_query}{', '.join(column_names)}"
-
-def generate_receive_insert_values(column_list, columns_info, base_query):
-    """수신 INSERT 문의 VALUES 부분 생성
-    Args:
-        column_list: 컬럼 목록
-        columns_info: 컬럼 정보 딕셔너리
-        base_query: 기본 쿼리 ($E$3에 해당)
-    
-    Returns:
-        VALUES 절 문자열
-    """
-    if not column_list:
-        return "송수신 컬럼 개수가 틀립니다!! 확인해주세요."
-    
-    # 일반 컬럼 처리
-    value_parts = []
-    for col_name in column_list:
-        col_info = columns_info.get(col_name)
-        if not col_info:
-            value_parts.append(f":{col_name}")
-            continue
-        
-        col_type = col_info['type']
-        
-        # DATE 타입 처리
-        if col_type == "DATE":
-            value_parts.append(f"TO_DATE(:{col_name},'YYYYMMDDHH24MISS')")
-        else:
-            value_parts.append(f":{col_name}")
-    
-    return f"{base_query}{','.join(value_parts)}"
 
 def generate_field_xml(column_list, columns_info):
     """필드 XML 생성
