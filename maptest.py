@@ -447,7 +447,7 @@ def generate_field_xml(column_list, columns_info):
         XML 문자열
     """
     # 필드 개수 계산 (field가 포함된 컬럼 수)
-    field_count = sum(1 for col_name in column_list if 'field' in col_name.lower())
+    field_count = len([col_name for col_name in column_list if col_name.strip()])
     
     # XML 라인 리스트
     xml_lines = []
