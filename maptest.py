@@ -269,60 +269,11 @@ class ColumnMapper:
         return generate_full_receive_sql(self.recv_table_info, self.recv_mapping, self.recv_columns)
 
     def generate_field_xml(self):
-        """송신 컬럼 기준으로 XML 필드 정의 생성"""
+        """필드 XML 생성"""
         if not self.send_mapping:
-            raise ValueError("송신 매핑 정보가 설정되지 않았습니다.")
-        if not self.send_columns:
-            raise ValueError("송신 테이블 정보가 설정되지 않았습니다.")
-
-        # 실제 필드 수 계산
-        field_count = len([col for col in self.send_mapping if col.strip()])  # 빈 문자열 제외
-
-        xml_lines = []
-        xml_lines.append(f'<fields count="{field_count}">')
-
-        for col_name in self.send_mapping:
-            if not col_name.strip():  # 빈 컬럼 스킵
-                continue
-
-            if col_name not in self.send_columns:
-                raise ValueError(f"송신 테이블에 {col_name} 컬럼이 존재하지 않습니다.")
-
-            col_info = self.send_columns[col_name]
-            field_attrs = ['key="0"', 'nofetch="0"', f'name="{col_name}"']
-
-            # 타입별 추가 속성 설정
-            col_type = col_info['type'].upper()
-            col_size = col_info['size']
-
-            if col_type in ('NVARCHAR', 'NCHAR', 'NVARCHAR2'):
-                # NCHAR 계열은 크기를 3배로
-                size = int(col_size) * 3
-                if size > 1024:
-                    field_attrs.append(f'length="{size}"')
-            elif col_type == 'BLOB':
-                field_attrs.extend([
-                    'length="1000000"',
-                    'type="blob"',
-                    'length_info="1000000"',
-                    'start_info="1"',
-                    'attr="bin"'
-                ])
-            elif col_type == 'CLOB':
-                field_attrs.extend([
-                    'length="3000000"',
-                    'type="clob"',
-                    'length_info="0"',
-                    'start_info="0"',
-                    'attr="bin"'
-                ])
-            elif col_size and int(col_size) > 1024:
-                field_attrs.append(f'length="{col_size}"')
-
-            xml_lines.append(f'<field {" ".join(field_attrs)}/>')
-
-        xml_lines.append('</fields>')
-        return '\n'.join(xml_lines)
+            return "송신 테이블 정보가 설정되지 않았습니다."
+        xml = generate_field_xml(self.send_mapping, self.send_columns)
+        return format_field_xml(xml)
 
     def generate_receive_insert_into(self, column_list, columns_info, base_query):
         """수신 INSERT 문의 INTO 부분 생성
