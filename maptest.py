@@ -314,8 +314,8 @@ class ColumnMapper:
     def generate_receive_insert_values(self, column_list, columns_info, base_query):
         """수신 INSERT 문의 VALUES 부분 생성
         Args:
-            column_list: 컬럼 목록
-            columns_info: 컬럼 정보 딕셔너리
+            column_list: 컬럼 목록 (수신 컬럼 목록)
+            columns_info: 컬럼 정보 딕셔너리 (수신 컬럼 정보)
             base_query: 기본 쿼리 ($E$3에 해당)
         
         Returns:
@@ -330,20 +330,25 @@ class ColumnMapper:
         ]
         
         # 사용자가 지정한 컬럼들의 값 추가
-        for col in column_list:
-            if not col:  # 빈 컬럼은 건너뜀
+        for idx, recv_col in enumerate(column_list):
+            if not recv_col:  # 빈 컬럼은 건너뜀
                 continue
                 
-            if col not in columns_info:
+            if recv_col not in columns_info:
                 continue
                 
-            col_info = columns_info[col]
+            # 송신 컬럼명 가져오기 (같은 인덱스의 송신 매핑에서)
+            send_col = self.send_mapping[idx] if idx < len(self.send_mapping) else None
+            if not send_col:
+                continue
+
+            col_info = columns_info[recv_col]
             
             # DATE 타입인 경우 TO_DATE 변환 추가
             if col_info['type'] == 'DATE':
-                sql_parts.append(f"TO_DATE(:{col}, 'YYYYMMDDHH24MISS')")
+                sql_parts.append(f"TO_DATE(:{send_col}, 'YYYYMMDDHH24MISS')")
             else:
-                sql_parts.append(f":{col}")
+                sql_parts.append(f":{send_col}")
         
         # 값들을 쉼표로 구분하여 합침
         values_sql = ", ".join(sql_parts)
