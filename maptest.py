@@ -598,9 +598,14 @@ if __name__ == "__main__":
         try:
             results = mapper.compare_columns()
             for result in results:
-                print(f"\n컬럼: {result['send_column']}")
+                print(f"\n송신 컬럼: {result['send_column']} -> 수신 컬럼: {result['recv_column']}")
                 if result['type_diff']: print(f"타입 차이: {result['type_diff']}")
-                if result['size_diff']: print(f"크기 차이: {result['size_diff']}")
+                if result['size_diff']: 
+                    print(f"크기 차이: {result['size_diff']}")
+                    # 문자형이고 수신 컬럼이 더 큰 경우 안전하다는 메시지 추가
+                    if ('CHAR' in result['send_info']['type'].upper() or 'VARCHAR' in result['send_info']['type'].upper()) and \
+                       int(result['recv_info']['size']) > int(result['send_info']['size']):
+                        print("(안전: 수신 컬럼의 크기가 더 크므로 데이터 손실 위험 없음)")
                 if result['size_over']: print(f"크기 초과: {result['size_over']}")
                 if result['nullable_diff']: print(f"Nullable 차이: {result['nullable_diff']}")
         except Exception as e:
