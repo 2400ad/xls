@@ -24,4 +24,3 @@ echo 원격 저장소에 푸시:
 git push origin main
 
 echo 완료!
-pause
