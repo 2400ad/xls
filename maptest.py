@@ -635,7 +635,7 @@ if __name__ == "__main__":
             print(f"수신 SQL 생성 실패: {str(e)}")
         
         print("\n" + "="*50)
-        print("8. 필드 XML 생성")
+        print("8. 필드 XML 생성1")
         print("="*50)
         try:
             field_xml = mapper.generate_field_xml()

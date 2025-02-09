@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pd:ProcessDefinition 
+    xmlns:pfx="http://www.tibco.com/schemas/COMMON/SharedResources/Schema/common/SchemaINFO.xsd"
+    xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+    xmlns:pd="http://xmlns.tibco.com/bw/process/2003"
+    xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
+    xmlns:ns1="http://www.tibco.com/pe/EngineTypes"
+    xmlns:BW="java://com.tibco.pe.core.JavaCustomXPATHFunctions">
+
+    <!-- 프로세스 기본 정보 -->
+    <pd:name>Processes/LV/EMS_64000/MOD_LV_S03/MOD.LV_TEST_READ_SEND.process</pd:name>
+    <pd:startName>Timer</pd:startName>
+    <pd:startX>0</pd:startX>
+    <pd:startY>0</pd:startY>
+    <pd:returnBindings/>
+
+    <!-- 타이머 스타터: 5분 간격 예시 -->
+    <pd:starter name="Timer">
+        <pd:type>com.tibco.plugin.timer.TimerEventSource</pd:type>
+        <pd:description>0 0/5 * * * ?</pd:description>
+        <pd:x>50</pd:x>
+        <pd:y>50</pd:y>
+        <config>
+            <StartTime>1458866860000</StartTime>
+            <Frequency>false</Frequency>
+            <TimeInterval>5</TimeInterval>
+            <FrequencyIndex>Minute</FrequencyIndex>
+            <_sequenceKey>"TEST_READ_SEND"</_sequenceKey>
+            <_customId>"TEST_READ_SEND"</_customId>
+        </config>
+        <pd:inputBindings/>
+    </pd:starter>
+
+    <!-- 1. DB에서 TEST_TABLE의 APPLE, BANANA 컬럼을 읽어오는 JDBC Query 액티비티 -->
+    <pd:activity name="QueryTestTable">
+        <pd:type>com.tibco.plugin.jdbc.JDBCQueryActivity</pd:type>
+        <pd:resourceType>ae.activities.JDBCQueryActivity</pd:resourceType>
+        <pd:x>150</pd:x>
+        <pd:y>50</pd:y>
+        <config>
+            <timeout>5000</timeout>
+            <commit>false</commit>
+            <emptyStrAsNil>false</emptyStrAsNil>
+            <jdbcSharedConfig>/SharedResources/JDBC/MOD_LV.sharedjdbc</jdbcSharedConfig>
+            <statement>SELECT APPLE, BANANA FROM TEST_TABLE</statement>
+        </config>
+        <pd:inputBindings>
+            <jdbcQueryActivityInput/>
+        </pd:inputBindings>
+    </pd:activity>
+
+    <!-- 2. 읽어온 데이터를 수신 프로세스에 전달하는 CallProcess 액티비티 -->
+    <pd:activity name="CallInsertProcess">
+        <pd:type>com.tibco.pre.core.CallProcessActivity</pd:type>
+        <pd:resourceType>ae.process.subprocess</pd:resourceType>
+        <pd:x>300</pd:x>
+        <pd:y>50</pd:y>
+        <config>
+            <!-- 수신 프로세스의 경로 (예: MOD.LV_TEST_INSERT_RECEIVE.process) -->
+            <processName>/Processes/LV/EMS_64000/MOD_LV_S03/MOD.LV_TEST_INSERT_RECEIVE.process</processName>
+        </config>
+        <pd:inputBindings>
+            <FRUIT1>
+                <xsl:value-of select="$QueryTestTable/jdbcQueryActivityOutput/row/APPLE"/>
+            </FRUIT1>
+            <FRUIT2>
+                <xsl:value-of select="$QueryTestTable/jdbcQueryActivityOutput/row/BANANA"/>
+            </FRUIT2>
+        </pd:inputBindings>
+    </pd:activity>
+
+    <pd:endName>End</pd:endName>
+    <pd:endX>500</pd:endX>
+    <pd:endY>100</pd:endY>
+
+</pd:ProcessDefinition>

@@ -1,0 +1,417 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pd:ProcessDefinition 
+    xmlns:pfx="http://www.tibco.com/schemas/COMMON/SharedResources/Schema/common/SchemaINFO.xsd"
+    xmlns:pfx2="www.tibco.com/plugin/Timer"
+    xmlns:ns="http://www.tibco.com/pe/DeployedVarsType"
+    xmlns:pfx4="http://www.tibco.com/schemas/MOD/SharedResources/Schema/source/LVMESP1/LVMES_MGR/TB_MES_IFO_XXX.xsd"
+    xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+    xmlns:ns0="www.tibco.com/plugin/Sleep"
+    xmlns:ns2="http://www.tibco.com/pe/CheckpointSchema"
+    xmlns:tib="http://www.tibco.com/bw/xslt/custom-functions"
+    xmlns:ns1="http://www.tibco.com/pe/EngineTypes"
+    xmlns:ns3="http://xmlns.tibco.com/bw/activity/xml/render/bytesEnvelope/2003/05"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
+    xmlns:ns02="http://www.tibco.com/namespaces/tnt/plugins/jms"
+    xmlns:pd="http://xmlns.tibco.com/bw/process/2003"
+    xmlns:BW="java://com.tibco.pe.core.JavaCustomXPATHFunctions">
+
+    <!-- 스키마 임포트 -->
+    <xsd:import namespace="http://www.tibco.com/schemas/COMMON/SharedResources/Schema/common/SchemaINFO.xsd" 
+        schemaLocation="/SharedResources/Schema/common/SchemaINFO.xsd"/>
+    <xsd:import namespace="http://www.tibco.com/schemas/MOD/SharedResources/Schema/source/LVMESP1/LVMES_MGR/TB_MES_IFO_XXX.xsd" 
+        schemaLocation="/SharedResources/Schema/source/LVMESP1/LVMES_MGR/TB_MES_IFO_XXX.xsd"/>
+    
+    <!-- 프로세스 기본 정보 -->
+    <pd:name>Processes/LV/EMS_64000/MOD_LV_S03/MOD.LVINVMTLREQ_SDB01.process</pd:name>
+    <pd:startName>Timer</pd:startName>
+    <pd:startX>0</pd:startX>
+    <pd:startY>0</pd:startY>
+    <pd:returnBindings/>
+    
+    <!-- 타이머 스타터 (Timer Event) -->
+    <pd:starter name="Timer">
+        <pd:type>com.tibco.plugin.timer.TimerEventSource</pd:type>
+        <pd:resourceType>ae.activities.timer</pd:resourceType>
+        <pd:description>0 1/5 * * * ?</pd:description>
+        <pd:x>69</pd:x>
+        <pd:y>55</pd:y>
+        <config>
+            <StartTime>1458866860000</StartTime>
+            <Frequency>false</Frequency>
+            <TimeInterval>5</TimeInterval>
+            <FrequencyIndex>Minute</FrequencyIndex>
+            <_sequenceKey>"LVINVMTLREQ_SDB01"</_sequenceKey>
+            <_customId>"LVINVMTLREQ_SDB01"</_customId>
+        </config>
+        <pd:inputBindings/>
+    </pd:starter>
+    
+    <!-- 엔드 포인트 -->
+    <pd:endName>End</pd:endName>
+    <pd:endX>893</pd:endX>
+    <pd:endY>163</pd:endY>
+    
+    <!-- 에러 스키마 (필요에 따라 확장) -->
+    <pd:errorSchemas/>
+    
+    <!-- 프로세스 변수 정의 -->
+    <pd:processVariables>
+        <INFO ref="pfx:INFO"/>
+    </pd:processVariables>
+    
+    <!-- 타겟 네임스페이스 -->
+    <pd:targetNamespace>http://xmlns.example.com/1358815752577</pd:targetNamespace>
+    
+    <!-- 1. 변수 할당 (Assign) 액티비티 -->
+    <pd:activity name="Assign">
+        <pd:type>com.tibco.pe.core.AssignActivity</pd:type>
+        <pd:resourceType>ae.activities.assignActivity</pd:resourceType>
+        <pd:x>157</pd:x>
+        <pd:y>54</pd:y>
+        <config>
+            <variableName>INFO</variableName>
+        </config>
+        <pd:inputBindings>
+            <pfx:INFO>
+                <pfx:PUBSUB>
+                    <xsl:value-of select="&quot;PUB&quot;"/>
+                </pfx:PUBSUB>
+                <pfx:GRP_ID>
+                    <xsl:value-of select="&quot;MOD&quot;"/>
+                </pfx:GRP_ID>
+                <pfx:IF_ID>
+                    <xsl:value-of select="$_processContext/ns1:ProcessContext/CustomId"/>
+                </pfx:IF_ID>
+                <pfx:SOURCE_GROUP>
+                    <xsl:value-of select="&quot;MOD_LV&quot;"/>
+                </pfx:SOURCE_GROUP>
+                <pfx:SOURCE_TABLE>
+                    <xsl:value-of select="&quot;LVMES_MGR.TB_MES_IFO_XXX&quot;"/>
+                </pfx:SOURCE_TABLE>
+                <pfx:EVENT_TYPE>
+                    <xsl:value-of select="&quot;ASSIGN&quot;"/>
+                </pfx:EVENT_TYPE>
+                <pfx:STATUS>
+                    <xsl:value-of select="&quot;Y&quot;"/>
+                </pfx:STATUS>
+                <pfx:TX_ID>
+                    <xsl:value-of select="generate-id($_processContext/ns1:ProcessContext/ProcessId)"/>
+                </pfx:TX_ID>
+                <pfx:CUR_DATE>
+                    <xsl:value-of select="current-dateTime()"/>
+                </pfx:CUR_DATE>
+                <pfx:MESSAGE>
+                    <xsl:value-of select="&quot;&quot;"/>
+                </pfx:MESSAGE>
+                <pfx:PROCESS_START_TIME>
+                    <xsl:value-of select="tib:format-dateTime('yyyyMMddHHmmss', current-dateTime())"/>
+                </pfx:PROCESS_START_TIME>
+                <pfx:HOST_NAME>
+                    <xsl:value-of select="BW:getHostName()"/>
+                </pfx:HOST_NAME>
+                <pfx:CRON>
+                    <xsl:value-of select="&quot;0 1/5 * * * ?&quot;"/>
+                </pfx:CRON>
+            </pfx:INFO>
+        </pd:inputBindings>
+    </pd:activity>
+    
+    <!-- 2. 로그 프로세스 호출 (JOB_START) 액티비티 -->
+    <pd:activity name="JOB_START">
+        <pd:type>com.tibco.pre.core.CallProcessActivity</pd:type>
+        <pd:resourceType>ae.process.subprocess</pd:resourceType>
+        <pd:x>234</pd:x>
+        <pd:y>55</pd:y>
+        <config>
+            <processName>/SharedProcesses/Log.process</processName>
+        </config>
+        <pd:inputBindings>
+            <pfx:INFO>
+                <pfx:PUBSUB>
+                    <xsl:value-of select="$INFO/pfx:INFO/pfx:PUBSUB"/>
+                </pfx:PUBSUB>
+                <pfx:GRP_ID>
+                    <xsl:value-of select="$INFO/pfx:INFO/pfx:GRP_ID"/>
+                </pfx:GRP_ID>
+                <pfx:IF_ID>
+                    <xsl:value-of select="$INFO/pfx:INFO/pfx:IF_ID"/>
+                </pfx:IF_ID>
+                <pfx:SOURCE_GROUP>
+                    <xsl:value-of select="$INFO/pfx:INFO/pfx:SOURCE_GROUP"/>
+                </pfx:SOURCE_GROUP>
+                <pfx:SOURCE_TABLE>
+                    <xsl:value-of select="$INFO/pfx:INFO/pfx:SOURCE_TABLE"/>
+                </pfx:SOURCE_TABLE>
+                <xsl:if test="$INFO/pfx:INFO/pfx:TARGET_GROUP">
+                    <pfx:TARGET_GROUP>
+                        <xsl:value-of select="$INFO/pfx:INFO/pfx:TARGET_GROUP"/>
+                    </pfx:TARGET_GROUP>
+                </xsl:if>
+                <xsl:if test="$INFO/pfx:INFO/pfx:TARGET_TABLE">
+                    <pfx:TARGET_TABLE>
+                        <xsl:value-of select="$INFO/pfx:INFO/pfx:TARGET_TABLE"/>
+                    </pfx:TARGET_TABLE>
+                </xsl:if>
+                <pfx:EVENT_TYPE>
+                    <xsl:value-of select="$_globalVariables/ns:GlobalVariables/LGDEAI/Constant/JOB_START"/>
+                </pfx:EVENT_TYPE>
+                <pfx:STATUS>
+                    <xsl:value-of select="&quot;Y&quot;"/>
+                </pfx:STATUS>
+                <pfx:TX_ID>
+                    <xsl:value-of select="$INFO/pfx:INFO/pfx:TX_ID"/>
+                </pfx:TX_ID>
+                <pfx:CUR_DATE>
+                    <xsl:value-of select="current-dateTime()"/>
+                </pfx:CUR_DATE>
+                <pfx:MESSAGE>
+                    <xsl:value-of select="concat(&quot;JOB_START #### Cron=[&quot;,$INFO/pfx:INFO/pfx:CRON,&quot;]&quot;)"/>
+                </pfx:MESSAGE>
+                <pfx:DATA>
+                    <xsl:value-of select="$_processContext/ns1:ProcessContext/EngineName"/>
+                </pfx:DATA>
+                <pfx:PROCESS_START_TIME>
+                    <xsl:value-of select="$INFO/pfx:INFO/pfx:PROCESS_START_TIME"/>
+                </pfx:PROCESS_START_TIME>
+                <pfx:HOST_NAME>
+                    <xsl:value-of select="$INFO/pfx:INFO/pfx:HOST_NAME"/>
+                </pfx:HOST_NAME>
+                <xsl:if test="$INFO/pfx:INFO/pfx:CRON">
+                    <pfx:CRON>
+                        <xsl:value-of select="$INFO/pfx:INFO/pfx:CRON"/>
+                    </pfx:CRON>
+                </xsl:if>
+            </pfx:INFO>
+        </pd:inputBindings>
+    </pd:activity>
+    
+    <!-- 3. JDBC 업데이트 (UpdateP) 액티비티 -->
+    <pd:activity name="UpdateP">
+        <pd:type>com.tibco.plugin.jdbc.JDBCUpdateActivity</pd:type>
+        <pd:resourceType>ae.activities.JDBCUpdateActivity</pd:resourceType>
+        <pd:x>179</pd:x>
+        <pd:y>180</pd:y>
+        <config>
+            <timeout>%%LGDEAI/JDBC/_UpsertTimeout%%</timeout>
+            <commit>false</commit>
+            <emptyStrAsNil>false</emptyStrAsNil>
+            <jdbcSharedConfig>/SharedResources/JDBC/MOD_LV.sharedjdbc</jdbcSharedConfig>
+            <statement>
+                UPDATE /*+ index(ix IX_IFO_XXX) */
+                LVMES_MGR.TB_MES_IFO_XXX ix
+                SET EAI_TRANSFER_FLAG='P'
+                WHERE EAI_TRANSFER_FLAG='N'
+            </statement>
+        </config>
+        <pd:inputBindings>
+            <jdbcUpdateActivityInput/>
+        </pd:inputBindings>
+    </pd:activity>
+    
+    <!-- 4. 업데이트 후 로그 호출 (UpdateP End) 액티비티 -->
+    <pd:activity name="UpdateP End">
+        <pd:type>com.tibco.pe.core.CallProcessActivity</pd:type>
+        <pd:resourceType>ae.process.subproess</pd:resourceType>
+        <pd:x>182</pd:x>
+        <pd:y>271</pd:y>
+        <config>
+            <processName>/SharedProcesses/Log.process</processName>
+        </config>
+        <pd:inputBindings>
+            <pfx:INFO>
+                <pfx:PUBSUB>
+                    <xsl:value-of select="$INFO/pfx:INFO/pfx:PUBSUB"/>
+                </pfx:PUBSUB>
+                <pfx:GRP_ID>
+                    <xsl:value-of select="$INFO/pfx:INFO/pfx:GRP_ID"/>
+                </pfx:GRP_ID>
+                <pfx:IF_ID>
+                    <xsl:value-of select="$INFO/pfx:INFO/pfx:IF_ID"/>
+                </pfx:IF_ID>
+                <pfx:SOURCE_GROUP>
+                    <xsl:value-of select="$INFO/pfx:INFO/pfx:SOURCE_GROUP"/>
+                </pfx:SOURCE_GROUP>
+                <pfx:SOURCE_TABLE>
+                    <xsl:value-of select="$INFO/pfx:INFO/pfx:SOURCE_TABLE"/>
+                </pfx:SOURCE_TABLE>
+                <pfx:EVENT_TYPE>
+                    <xsl:value-of select="$_globalVariables/ns:GlobalVariables/LGDEAI/Constant/UPDATE_PE"/>
+                </pfx:EVENT_TYPE>
+                <pfx:STATUS>
+                    <xsl:value-of select="&quot;Y&quot;"/>
+                </pfx:STATUS>
+                <pfx:TX_ID>
+                    <xsl:value-of select="$INFO/pfx:INFO/pfx:TX_ID"/>
+                </pfx:TX_ID>
+                <pfx:CUR_DATE>
+                    <xsl:value-of select="current-dateTime()"/>
+                </pfx:CUR_DATE>
+                <pfx:MESSAGE>
+                    <xsl:value-of select="concat(&quot;UpdateP End #### UpdateCount =[&quot;,$UpdateP/jdbcUpdateActivityOutput/noOfUpdates,&quot;]&quot;)"/>
+                </pfx:MESSAGE>
+                <pfx:PROCESS_START_TIME>
+                    <xsl:value-of select="$INFO/pfx:INFO/pfx:PROCESS_START_TIME"/>
+                </pfx:PROCESS_START_TIME>
+                <pfx:HOST_NAME>
+                    <xsl:value-of select="$INFO/pfx:INFO/pfx:HOST_NAME"/>
+                </pfx:HOST_NAME>
+            </pfx:INFO>
+        </pd:inputBindings>
+    </pd:activity>
+    
+    <!-- 5. 에러 처리 (CheckError) 액티비티 -->
+    <pd:activity name="CheckError">
+        <pd:type>com.tibco.pe.core.CallProcessActivity</pd:type>
+        <pd:resourceType>ae.process.subprocess</pd:resourceType>
+        <pd:x>650</pd:x>
+        <pd:y>111</pd:y>
+        <config>
+            <processName>/SharedProcesses/Log.process</processName>
+        </config>
+        <pd:inputBindings>
+            <pfx:INFO>
+                <pfx:PUBSUB>
+                    <xsl:value-of select="$INFO/pfx:INFO/pfx:PUBSUB"/>
+                </pfx:PUBSUB>
+                <pfx:GRP_ID>
+                    <xsl:value-of select="$INFO/pfx:INFO/pfx:GRP_ID"/>
+                </pfx:GRP_ID>
+                <pfx:IF_ID>
+                    <xsl:value-of select="$INFO/pfx:INFO/pfx:IF_ID"/>
+                </pfx:IF_ID>
+                <pfx:SOURCE_GROUP>
+                    <xsl:value-of select="$INFO/pfx:INFO/pfx:SOURCE_GROUP"/>
+                </pfx:SOURCE_GROUP>
+                <pfx:SOURCE_TABLE>
+                    <xsl:value-of select="$INFO/pfx:INFO/pfx:SOURCE_TABLE"/>
+                </pfx:SOURCE_TABLE>
+                <pfx:EVENT_TYPE>
+                    <xsl:value-of select="$_globalVariables/ns:GlobalVariables/LGDEAI/Constant/ERROR"/>
+                </pfx:EVENT_TYPE>
+                <pfx:STATUS>
+                    <xsl:value-of select="&quot;N&quot;"/>
+                </pfx:STATUS>
+                <pfx:TX_ID>
+                    <xsl:value-of select="$INFO/pfx:INFO/pfx:TX_ID"/>
+                </pfx:TX_ID>
+                <pfx:CUR_DATE>
+                    <xsl:value-of select="current-dateTime()"/>
+                </pfx:CUR_DATE>
+                <pfx:MESSAGE>
+                    <xsl:value-of select="concat(&quot;ChkErr #### [&quot;, $INFO/pfx:INFO/pfx:GRP_ID, &quot;.&quot;,$INFO/pfx:INFO/pfx:IF_ID, &quot;] This Job will end. Next schedule is [&quot;,$INFO/pfx:INFO/pfx:CRON,&quot;]&quot;)"/>
+                </pfx:MESSAGE>
+                <pfx:PROCESS_START_TIME>
+                    <xsl:value-of select="$INFO/pfx:INFO/pfx:PROCESS_START_TIME"/>
+                </pfx:PROCESS_START_TIME>
+                <pfx:HOST_NAME>
+                    <xsl:value-of select="$INFO/pfx:INFO/pfx:HOST_NAME"/>
+                </pfx:HOST_NAME>
+            </pfx:INFO>
+        </pd:inputBindings>
+    </pd:activity>
+    
+    <!-- 6. 루프 그룹 (CheckGroup) 내 활동 -->
+    <pd:group name="CheckGroup">
+        <pd:type>com.tibco.pe.core.LoopGroup</pd:type>
+        <pd:resourceType>ae.process.group</pd:resourceType>
+        <pd:x>288</pd:x>
+        <pd:y>28</pd:y>
+        <pd:width>192</pd:width>
+        <pd:height>120</pd:height>
+        <pd:collapsedWidth>57</pd:collapsedWidth>
+        <pd:collapsedHeight>70</pd:collapsedHeight>
+        <pd:groupVariables/>
+        <pd:joinToggle>inherit</pd:joinToggle>
+        <config>
+            <pd:groupType>errorLoop</pd:groupType>
+            <pd:serializable>false</pd:serializable>
+            <pd:indexSlot>indexC</pd:indexSlot>
+            <pd:errorCondition>$indexC &gt; 3</pd:errorCondition>
+            <pd:suspendAfterErrorRetry>false</pd:suspendAfterErrorRetry>
+        </config>
+        <pd:inputBindings/>
+        <pd:expanded>true</pd:expanded>
+        <pd:transition>
+            <pd:from>start</pd:from>
+            <pd:to>SleepCheck</pd:to>
+            <pd:lineType>Default</pd:lineType>
+            <pd:lineColor>-16777216</pd:lineColor>
+            <pd:conditionType>always</pd:conditionType>
+        </pd:transition>
+        <pd:transition>
+            <pd:from>Check MOD_LV</pd:from>
+            <pd:to>end</pd:to>
+            <pd:lineType>Default</pd:lineType>
+            <pd:lineColor>-16777216</pd:lineColor>
+            <pd:conditionType>always</pd:conditionType>
+        </pd:transition>
+        <pd:transition>
+            <pd:from>SleepCheck</pd:from>
+            <pd:to>Check MOD_LV</pd:to>
+            <pd:lineType>Default</pd:lineType>
+            <pd:lineColor>-16777216</pd:lineColor>
+            <pd:conditionType>always</pd:conditionType>
+        </pd:transition>
+        
+        <!-- SleepCheck 액티비티 -->
+        <pd:activity name="SleepCheck">
+            <pd:type>com.tibco.plugin.timer.SleepActivity</pd:type>
+            <pd:resourceType>ae.activities.sleep</pd:resourceType>
+            <pd:x>345</pd:x>
+            <pd:y>81</pd:y>
+            <config/>
+            <pd:inputBindings>
+                <ns0:SleepInputSchema>
+                    <IntervalInMillisec>
+                        <xsl:value-of select="if($indexC = 1) then 1 else $_globalVariables/ns:GlobalVariables/LGDEAI/JDBC/_CheckSleepTime"/>
+                    </IntervalInMillisec>
+                </ns0:SleepInputSchema>
+            </pd:inputBindings>
+        </pd:activity>
+        
+        <!-- Check MOD_LV 액티비티 -->
+        <pd:activity name="Check MOD_LV">
+            <pd:type>com.tibco.plugin.jdbc.JDBCQueryActivity</pd:type>
+            <pd:resourceType>ae.activities.JDBCQueryActivity</pd:resourceType>
+            <pd:x>409</pd:x>
+            <pd:y>83</pd:y>
+            <config>
+                <timeout>%%LGDEAI/JDBC/_QueryTimeout%%</timeout>
+                <commit>false</commit>
+                <maxRows>%%LGDEAI/JDBC/_QueryMaxRow%%</maxRows>
+                <emptyStrAsNil>false</emptyStrAsNil>
+                <jdbcSharedConfig>/SharedResources/JDBC/MOD_LV.sharedjdbc</jdbcSharedConfig>
+                <statement>SELECT 1 FROM DUAL</statement>
+                <oraObjects/>
+                <oraTables/>
+                <QueryOutputCachedSchemaColumns>_1</QueryOutputCachedSchemaColumns>
+                <QueryOutputCachedSchemaDataTypes>2</QueryOutputCachedSchemaDataTypes>
+                <QueryOutputCachedSchemaDataTypesName>NUMBER</QueryOutputCachedSchemaDataTypesName>
+                <QueryOutputCachedSchemaStatus>OptionalElement</QueryOutputCachedSchemaStatus>
+            </config>
+            <pd:inputBindings>
+                <jdbcQueryActivityInput/>
+            </pd:inputBindings>
+        </pd:activity>
+    </pd:group>
+    
+    <!-- 7. SMS 전송 (SMS4Check) 액티비티 -->
+    <pd:activity name="SMS4Check">
+        <pd:type>com.tibco.plugin.sms.SMSActivity</pd:type>
+        <pd:resourceType>ae.activities.sms</pd:resourceType>
+        <pd:x>500</pd:x>
+        <pd:y>300</pd:y>
+        <config>
+            <smsGateway>http://sms.gateway.example.com/api</smsGateway>
+            <senderId>ExampleSender</senderId>
+            <recipient>+821012345678</recipient>
+            <message>Process completed successfully.</message>
+            <timeout>5000</timeout>
+        </config>
+        <pd:inputBindings>
+            <smsInputSchema/>
+        </pd:inputBindings>
+    </pd:activity>
+
+</pd:ProcessDefinition>

@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pd:ProcessDefinition 
+    xmlns:pfx="http://www.tibco.com/schemas/COMMON/SharedResources/Schema/common/SchemaINFO.xsd"
+    xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+    xmlns:pd="http://xmlns.tibco.com/bw/process/2003"
+    xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
+    xmlns:ns1="http://www.tibco.com/pe/EngineTypes"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
+    <!-- 프로세스 기본 정보 -->
+    <pd:name>Processes/LV/EMS_64000/MOD_LV_S03/MOD.LV_TEST_INSERT_RECEIVE.process</pd:name>
+    <pd:startName>MessageStarter</pd:startName>
+    <pd:startX>0</pd:startX>
+    <pd:startY>0</pd:startY>
+    <pd:returnBindings/>
+
+    <!-- 호출에 의해 시작되는 Starter -->
+    <pd:starter name="MessageStarter">
+        <pd:type>com.tibco.pe.core.CallProcessStarter</pd:type>
+        <pd:resourceType>ae.process.subprocess</pd:resourceType>
+        <pd:x>50</pd:x>
+        <pd:y>50</pd:y>
+        <pd:inputBindings/>
+    </pd:starter>
+
+    <!-- 수신 프로세스 변수 정의 (전달받은 값이 저장됨) -->
+    <pd:processVariables>
+        <FRUIT1 xsi:type="xsd:date"/>
+        <FRUIT2 xsi:type="xsd:string"/>
+    </pd:processVariables>
+
+    <!-- 1. 전달받은 데이터를 TEST2_TABLE에 INSERT 하는 JDBC Insert 액티비티 -->
+    <pd:activity name="InsertIntoTest2">
+        <!-- JDBC Insert는 일반적으로 JDBC Update 액티비티를 사용 -->
+        <pd:type>com.tibco.plugin.jdbc.JDBCUpdateActivity</pd:type>
+        <pd:resourceType>ae.activities.JDBCUpdateActivity</pd:resourceType>
+        <pd:x>150</pd:x>
+        <pd:y>50</pd:y>
+        <config>
+            <timeout>5000</timeout>
+            <!-- commit을 true로 설정하여 INSERT 수행 후 즉시 반영 -->
+            <commit>true</commit>
+            <emptyStrAsNil>false</emptyStrAsNil>
+            <jdbcSharedConfig>/SharedResources/JDBC/MOD_LV.sharedjdbc</jdbcSharedConfig>
+            <!-- INSERT 문: 파라미터 순서대로 매핑 -->
+            <statement>INSERT INTO TEST2_TABLE (FRUIT1, FRUIT2) VALUES (?, ?)</statement>
+        </config>
+        <pd:inputBindings>
+            <jdbcUpdateActivityInput>
+                <param1>
+                    <xsl:value-of select="$FRUIT1"/>
+                </param1>
+                <param2>
+                    <xsl:value-of select="$FRUIT2"/>
+                </param2>
+            </jdbcUpdateActivityInput>
+        </pd:inputBindings>
+    </pd:activity>
+
+    <pd:endName>End</pd:endName>
+    <pd:endX>300</pd:endX>
+    <pd:endY>100</pd:endY>
+
+</pd:ProcessDefinition>
