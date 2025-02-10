@@ -256,7 +256,7 @@ class ColumnMapper:
             return "Nullable NG (수신 Not Null 제약 위반 가능성)"
         return ""
 
-    def generate_send_sql(self):
+    def generate_send_sql_from_mapping(self):
         """송신 SQL 생성"""
         if not self.send_mapping or not self.send_table_info:
             return "송신 테이블 정보가 설정되지 않았습니다."
@@ -268,7 +268,7 @@ class ColumnMapper:
             return "수신 테이블 정보가 설정되지 않았습니다."
         return self.generate_full_receive_sql(self.recv_table_info, self.recv_mapping, self.recv_columns)
 
-    def generate_field_xml(self):
+    def generate_field_xml_from_mapping(self):
         """필드 XML 생성"""
         if not self.send_mapping:
             return "송신 테이블 정보가 설정되지 않았습니다."
@@ -587,7 +587,7 @@ if __name__ == "__main__":
         print("6. 송신 SQL 생성")
         print("="*50)
         try:
-            send_sql = mapper.generate_send_sql()
+            send_sql = mapper.generate_send_sql_from_mapping()
             print(send_sql)
         except Exception as e:
             print(f"송신 SQL 생성 실패: {str(e)}")
@@ -605,7 +605,7 @@ if __name__ == "__main__":
         print("8. 필드 XML 생성3")
         print("="*50)
         try:
-            field_xml = mapper.generate_field_xml()
+            field_xml = mapper.generate_field_xml_from_mapping()
             print(field_xml)
         except Exception as e:
             print(f"필드 XML 생성 실패: {str(e)}")
