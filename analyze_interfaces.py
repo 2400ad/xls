@@ -73,9 +73,9 @@ def analyze_excel():
         wb = openpyxl.load_workbook('input.xlsx', data_only=True)
         ws = wb.active
         
-        # 3컬럼씩 인터페이스 정보 읽기
+        # 3컬럼씩 인터페이스 정보 읽기 (B열부터 시작)
         interfaces = []
-        for col in range(1, ws.max_column + 1, 3):
+        for col in range(2, ws.max_column + 1, 3):  # 2는 B열을 의미
             interface_info = read_interface_block(ws, col)
             if interface_info:
                 interfaces.append(interface_info)
