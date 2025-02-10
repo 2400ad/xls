@@ -51,7 +51,10 @@ class XMLParserApp:
             root = tree.getroot()
             
             # Handle namespaces
-            namespaces = {'pd': re.findall(r'{(.*?)}', root.tag)[0] if '}' in root.tag else ''}
+            namespaces = {
+                'pd': re.findall(r'{(.*?)}', root.tag)[0] if '}' in root.tag else '',
+                'xsl': 'http://www.w3.org/1999/XSL/Transform'
+            }
             
             # Find all SQL statements
             sql_count = 0
@@ -63,8 +66,43 @@ class XMLParserApp:
                         if statement is not None and statement.text:
                             sql_count += 1
                             activity_name = activity.get('name', 'Unknown')
+                            
+                            # Get the SQL and find the column mappings
+                            sql = statement.text.strip()
+                            
+                            # Find inputBindings for this activity
+                            input_bindings = activity.find('.//pd:inputBindings', namespaces)
+                            if input_bindings is not None:
+                                record = input_bindings.find('.//Record')
+                                if record is not None:
+                                    # Get all direct mappings (simple value-of)
+                                    for elem in record.findall('.//*'):
+                                        value_of = elem.find('.//xsl:value-of', namespaces)
+                                        if value_of is not None:
+                                            select_val = value_of.get('select')
+                                            if select_val:
+                                                # Replace ? with :column_name in SQL
+                                                sql = sql.replace('?', ':' + select_val, 1)
+                                                continue
+                                                
+                                        # Get conditional mappings (choose/when)
+                                        choose = elem.find('.//xsl:choose', namespaces)
+                                        if choose is not None:
+                                            when = choose.find('.//xsl:when', namespaces)
+                                            if when is not None:
+                                                test_val = when.get('test', '')
+                                                if test_val.startswith('exists('):
+                                                    # Extract column name from exists()
+                                                    col_name = test_val[7:-1]  # Remove exists( and )
+                                                    value_of = when.find('.//xsl:value-of', namespaces)
+                                                    if value_of is not None:
+                                                        select_val = value_of.get('select')
+                                                        if select_val:
+                                                            # Replace ? with :column_name in SQL
+                                                            sql = sql.replace('?', ':' + select_val, 1)
+                            
                             self.result_text.insert(tk.END, f"\n--- SQL Query #{sql_count} (Activity: {activity_name}) ---\n")
-                            self.result_text.insert(tk.END, statement.text.strip() + "\n")
+                            self.result_text.insert(tk.END, sql + "\n")
             
             if sql_count == 0:
                 self.result_text.insert(tk.END, "No SQL queries found in the XML file.")
