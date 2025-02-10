@@ -385,29 +385,13 @@ class ColumnMapper:
         Returns:
             완성된 SELECT 문
         """
-        columns = []
-        for col in column_list:
-            if col in columns_info:
-                columns.append(col)
-        
-        if not columns:
+        # generate_send_sql을 호출하여 컬럼 부분 생성
+        columns_sql = self.generate_send_sql(column_list, columns_info, "")
+        if not columns_sql:
             return ""
-        
-        sql = f"SELECT\n"
-        # 컬럼들을 2개씩 그룹화하여 포매팅
-        formatted_parts = []
-        for i in range(0, len(columns), 2):
-            pair = []
-            pair.append(columns[i])
-            if i + 1 < len(columns):
-                pair.append(columns[i+1])
-            formatted_parts.append(f"    {', '.join(pair)}")
-        
-        # 마지막 쉼표 제거를 위해 마지막 줄만 따로 처리
-        if formatted_parts:
-            formatted_parts[-1] = formatted_parts[-1].rstrip(',')
-        
-        sql += ",\n".join(formatted_parts)
+            
+        # SELECT 문 조합
+        sql = f"SELECT\n{columns_sql}"
         sql += f"\nFROM {table_info['owner']}.{table_info['table_name']}"
         return sql
 
