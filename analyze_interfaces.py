@@ -1,54 +1,58 @@
-import pandas as pd
+import openpyxl
 import ast
 from maptest import ColumnMapper
 
-def read_interface_block(df, start_col):
+def read_interface_block(ws, start_col):
     """Excel에서 3컬럼 단위로 하나의 인터페이스 정보를 읽습니다.
     
     Args:
-        df: DataFrame
-        start_col: 시작 컬럼 인덱스 (0부터 시작)
+        ws: Worksheet
+        start_col: 시작 컬럼 인덱스 (1부터 시작)
     
     Returns:
         interface_info: 인터페이스 정보를 담은 딕셔너리
     """
-    # 컬럼 이름 가져오기
-    cols = df.columns[start_col:start_col+3]
-    if len(cols) < 3:
+    # 첫번째 컬럼에서 정보 추출
+    interface_name = ws.cell(row=1, column=start_col).value
+    if not interface_name:  # 더 이상 인터페이스가 없음
         return None
         
-    # 첫번째 컬럼에서 정보 추출
-    interface_name = df.iloc[0, start_col]
-    interface_id = df.iloc[1, start_col]
+    interface_id = ws.cell(row=2, column=start_col).value
     
     try:
         # 문자열로 된 dict를 실제 dict로 변환
-        send_db = ast.literal_eval(df.iloc[2, start_col])
-        send_table = ast.literal_eval(df.iloc[3, start_col])
-        recv_db = ast.literal_eval(df.iloc[2, start_col+1])
-        recv_table = ast.literal_eval(df.iloc[3, start_col+1])
+        send_db = ast.literal_eval(ws.cell(row=3, column=start_col).value)
+        send_table = ast.literal_eval(ws.cell(row=4, column=start_col).value)
+        recv_db = ast.literal_eval(ws.cell(row=3, column=start_col+1).value)
+        recv_table = ast.literal_eval(ws.cell(row=4, column=start_col+1).value)
     except Exception as e:
         print(f"Error parsing DB/Table info for interface {interface_name}: {str(e)}")
         return None
     
     # 컬럼 정보 시작 행
-    start_row = 4
+    start_row = 5
     
     # 빈 값이 아닌 행까지의 컬럼 정보 수집
     send_columns = []
     recv_columns = []
     comments = []
     
-    for idx, row in df.iloc[start_row:].iterrows():
-        if pd.isna(row[start_col]) and pd.isna(row[start_col+1]):
+    max_row = ws.max_row
+    for row in range(start_row, max_row + 1):
+        send_val = ws.cell(row=row, column=start_col).value
+        recv_val = ws.cell(row=row, column=start_col+1).value
+        comment_val = ws.cell(row=row, column=start_col+2).value
+        
+        # 둘 다 빈 값이면 종료
+        if not send_val and not recv_val:
             break
             
-        if not pd.isna(row[start_col]):
-            send_columns.append(row[start_col])
-        if not pd.isna(row[start_col+1]):
-            recv_columns.append(row[start_col+1])
-        if not pd.isna(row[start_col+2]):
-            comments.append(row[start_col+2])
+        if send_val:
+            send_columns.append(send_val)
+        if recv_val:
+            recv_columns.append(recv_val)
+        if comment_val:
+            comments.append(comment_val)
     
     return {
         'name': interface_name,
@@ -66,14 +70,17 @@ def analyze_excel():
     """input.xlsx 파일을 읽고 분석합니다."""
     try:
         # Excel 파일 읽기
-        df = pd.read_excel('input.xlsx', header=None)
+        wb = openpyxl.load_workbook('input.xlsx', data_only=True)
+        ws = wb.active
         
         # 3컬럼씩 인터페이스 정보 읽기
         interfaces = []
-        for i in range(0, len(df.columns), 3):
-            interface_info = read_interface_block(df, i)
+        for col in range(1, ws.max_column + 1, 3):
+            interface_info = read_interface_block(ws, col)
             if interface_info:
                 interfaces.append(interface_info)
+            else:
+                break  # 더 이상 인터페이스가 없음
         
         # 분석 결과 출력
         print(f"총 {len(interfaces)}개의 인터페이스를 발견했습니다.\n")
@@ -106,6 +113,9 @@ def analyze_excel():
             
     except Exception as e:
         print(f"Error analyzing Excel file: {str(e)}")
+    finally:
+        if 'wb' in locals():
+            wb.close()
 
 if __name__ == "__main__":
     analyze_excel()
