@@ -303,13 +303,18 @@ class ColumnMapper:
                 
             sql_parts.append(col)
         
-        # 컬럼들을 쉼표로 구분하여 합침
-        columns_sql = ", ".join(sql_parts)
+        # 컬럼들을 2개씩 그룹화하여 포매팅
+        formatted_parts = []
+        for i in range(0, len(sql_parts), 2):
+            if i + 1 < len(sql_parts):
+                formatted_parts.append(f"    {sql_parts[i]}, {sql_parts[i+1]}")
+            else:
+                formatted_parts.append(f"    {sql_parts[i]}")
         
         # 기본 쿼리가 있으면 합치고, 없으면 컬럼 목록만 반환
         if base_query:
-            return f"{base_query}{columns_sql}"
-        return columns_sql
+            return f"{base_query}\n" + ",\n".join(formatted_parts)
+        return ",\n".join(formatted_parts)
 
     def generate_receive_insert_values(self, column_list, columns_info, base_query):
         """수신 INSERT 문의 VALUES 부분 생성
@@ -323,10 +328,8 @@ class ColumnMapper:
         """
         # 필수 시스템 컬럼 값 추가 (항상 처음에 포함)
         sql_parts = [
-            ":EAI_SEQ_ID",
-            ":DATA_INTERFACE_TYPE_CODE",
-            "SYSDATE",  # 하드코딩 값
-            "'N'"      # 하드코딩 값
+            ":EAI_SEQ_ID", ":DATA_INTERFACE_TYPE_CODE",
+            "SYSDATE", "'N'"
         ]
         
         # 사용자가 지정한 컬럼들의 값 추가
@@ -350,13 +353,18 @@ class ColumnMapper:
             else:
                 sql_parts.append(f":{send_col}")
         
-        # 값들을 쉼표로 구분하여 합침
-        values_sql = ", ".join(sql_parts)
+        # 값들을 2개씩 그룹화하여 포매팅
+        formatted_parts = []
+        for i in range(0, len(sql_parts), 2):
+            if i + 1 < len(sql_parts):
+                formatted_parts.append(f"    {sql_parts[i]}, {sql_parts[i+1]}")
+            else:
+                formatted_parts.append(f"    {sql_parts[i]}")
         
         # 기본 쿼리가 있으면 합치고, 없으면 값 목록만 반환
         if base_query:
-            return f"{base_query}{values_sql}"
-        return values_sql
+            return f"{base_query}\n" + ",\n".join(formatted_parts)
+        return ",\n".join(formatted_parts)
 
     def generate_full_send_sql(self, table_info, column_list, columns_info):
         """전체 송신 SQL 생성 (SELECT 문 전체)
@@ -377,8 +385,16 @@ class ColumnMapper:
         if not columns:
             return ""
         
-        sql = f"SELECT {', '.join(columns)}\n"
-        sql += f"FROM {table_info['owner']}.{table_info['table_name']}"
+        sql = f"SELECT\n"
+        # 컬럼들을 2개씩 그룹화하여 포매팅
+        formatted_parts = []
+        for i in range(0, len(columns), 2):
+            if i + 1 < len(columns):
+                formatted_parts.append(f"    {columns[i]}, {columns[i+1]}")
+            else:
+                formatted_parts.append(f"    {columns[i]}")
+        sql += ",\n".join(formatted_parts)
+        sql += f"\nFROM {table_info['owner']}.{table_info['table_name']}"
         return sql
 
     def generate_send_sql(self, column_list, columns_info, base_query):
@@ -410,13 +426,21 @@ class ColumnMapper:
             else:
                 sql_parts.append(col)
         
-        # 컬럼들을 쉼표로 구분하여 합침
-        columns_sql = ", ".join(sql_parts)
+        # 컬럼들을 2개씩 그룹화하여 포매팅
+        formatted_parts = []
+        for i in range(0, len(sql_parts), 2):
+            if i + 1 < len(sql_parts):
+                formatted_parts.append(f"    {sql_parts[i]}, {sql_parts[i+1]}")
+            else:
+                formatted_parts.append(f"    {sql_parts[i]}")
         
-        # 기본 쿼리가 있으면 합치고, 없으면 컬럼 목록만 반환
+        # SQL 문 조합
         if base_query:
-            return f"{base_query}{columns_sql}"
-        return columns_sql
+            sql = f"{base_query}\n"
+        else:
+            sql = "SELECT\n"
+        sql += ",\n".join(formatted_parts)
+        return sql
 
     def generate_full_receive_sql(self, table_info, column_list, columns_info):
         """전체 수신 INSERT 문 생성
@@ -436,12 +460,12 @@ class ColumnMapper:
         base_query += f"{table_info['table_name']} ("
         
         # INTO 절 생성 (기본 시스템 컬럼 포함)
-        into_part = self.generate_receive_insert_into(column_list, columns_info, base_query)
+        into_part = self.generate_receive_insert_into(column_list, columns_info, "")
         
         # VALUES 절 생성 (기본 시스템 값 포함)
-        values_part = self.generate_receive_insert_values(column_list, columns_info, "VALUES (")
+        values_part = self.generate_receive_insert_values(column_list, columns_info, "")
         
-        return f"{into_part})\n{values_part})"
+        return f"{base_query}\n{into_part}\n) VALUES (\n{values_part}\n)"
 
     def generate_field_xml(self, column_list, columns_info):
         """필드 XML 생성
