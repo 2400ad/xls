@@ -43,21 +43,19 @@ def read_interface_block(ws, start_col):
         recv_val = ws.cell(row=row, column=start_col+1).value
         comment_val = ws.cell(row=row, column=start_col+2).value
         
-        # 송신과 수신 컬럼이 모두 없는 경우에만 종료
-        if not send_val and not recv_val:
-            # 이전 행까지 모두 비어있는지 확인
-            prev_send = ws.cell(row=row-1, column=start_col).value
-            prev_recv = ws.cell(row=row-1, column=start_col+1).value
-            if not prev_send and not prev_recv:
-                break
+        # 송신 컬럼이 비어있으면 종료
+        if not send_val:
+            break
             
-        # 송신이나 수신 중 하나라도 있으면 추가
-        if send_val is not None:  # 빈 문자열도 값으로 처리
-            send_columns.append(send_val)
-        if recv_val is not None:  # 빈 문자열도 값으로 처리
-            recv_columns.append(recv_val)
+        # 송신 컬럼 추가
+        send_columns.append(send_val)
+        
+        # 수신 컬럼과 설명 추가 (수신은 빈 문자열일 수 있음)
+        recv_columns.append(recv_val if recv_val else '')
         if comment_val:
             comments.append(comment_val)
+        else:
+            comments.append('')
     
     return {
         'name': interface_name,
@@ -106,8 +104,9 @@ def analyze_excel():
             print(f"테이블 정보: {interface['recv_table']}")
             print("컬럼 목록:")
             for i, col in enumerate(interface['recv_columns']):
-                print(f"  {i+1}. {col}")
-            
+                if col:  # 빈 문자열이 아닌 경우만 출력
+                    print(f"  {i+1}. {col}")
+                
             print("\n[컬럼 매핑]")
             # 송신과 수신 컬럼을 별도로 출력
             print("송신 컬럼:")
@@ -116,17 +115,19 @@ def analyze_excel():
                 
             print("\n수신 컬럼:")
             for i, col in enumerate(interface['recv_columns']):
-                print(f"  {i+1}. {col}")
+                if col:  # 빈 문자열이 아닌 경우만 출력
+                    print(f"  {i+1}. {col}")
                 
             print("\n매핑 관계:")
-            # 실제 매핑 관계만 출력
-            mapping_count = min(len(interface['send_columns']), len(interface['recv_columns']))
-            for i in range(mapping_count):
-                comment = interface['comments'][i] if i < len(interface['comments']) else ""
-                if interface['recv_columns'][i]:  # 수신 컬럼이 있는 경우만 매핑 표시
-                    print(f"  {interface['send_columns'][i]} -> {interface['recv_columns'][i]}")
+            # 실제 매핑 관계만 출력 (수신 컬럼이 빈 문자열이 아닌 경우)
+            for i, (send_col, recv_col) in enumerate(zip(interface['send_columns'], interface['recv_columns'])):
+                if recv_col:  # 수신 컬럼이 있는 경우만 매핑 표시
+                    comment = interface['comments'][i]
+                    print(f"  {send_col} -> {recv_col}")
                     if comment:
                         print(f"    설명: {comment}")
+                else:
+                    print(f"  {send_col} -> (매핑 없음)")
             print()
             
     except Exception as e:
