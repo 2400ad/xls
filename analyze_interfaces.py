@@ -37,26 +37,31 @@ def read_interface_block(ws, start_col):
     recv_columns = []
     comments = []
     
+    # 먼저 송신 컬럼 목록을 모두 수집
     max_row = ws.max_row
+    last_send_row = start_row
     for row in range(start_row, max_row + 1):
         send_val = ws.cell(row=row, column=start_col).value
+        if not send_val:
+            break
+        send_columns.append(send_val)
+        last_send_row = row
+    
+    # 송신 컬럼 개수만큼 수신 컬럼과 코멘트 초기화
+    recv_columns = [''] * len(send_columns)
+    comments = [''] * len(send_columns)
+    
+    # 수신 컬럼 매핑
+    for row in range(start_row, last_send_row + 1):
         recv_val = ws.cell(row=row, column=start_col+1).value
         comment_val = ws.cell(row=row, column=start_col+2).value
         
-        # 송신 컬럼이 비어있으면 종료
-        if not send_val:
-            break
-            
-        # 송신 컬럼 추가
-        send_columns.append(send_val)
-        
-        # 수신 컬럼과 설명 추가 (수신은 빈 문자열일 수 있음)
-        recv_columns.append(recv_val if recv_val else '')
-        if comment_val:
-            comments.append(comment_val)
-        else:
-            comments.append('')
-    
+        if recv_val:  # 수신 컬럼이 있는 경우만 해당 위치에 매핑
+            idx = row - start_row
+            recv_columns[idx] = recv_val
+            if comment_val:
+                comments[idx] = comment_val
+                
     return {
         'name': interface_name,
         'id': interface_id,
