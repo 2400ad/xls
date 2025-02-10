@@ -3,6 +3,7 @@ import pandas as pd
 
 class ColumnMapper:
     def __init__(self):
+        oracledb.init_oracle_client(lib_dir=r"C:\instantclient_21_3")
         self.send_connection = None
         self.recv_connection = None
         self.send_mapping = []  # 사용자가 입력한 송신 컬럼 순서
@@ -542,7 +543,7 @@ class ColumnMapper:
             xml_parts.append(f'<field {attr_str}/>')
         
         xml_parts.append('</fields>')
-        return '\n'.join(xml_parts)
+        return ''.join(xml_parts)
 
     def format_field_xml(self, xml_str):
         """XML 문자열을 보기 좋게 포맷팅
