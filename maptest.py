@@ -287,10 +287,8 @@ class ColumnMapper:
         """
         # 필수 시스템 컬럼 추가 (항상 처음에 포함)
         sql_parts = [
-            "EAI_SEQ_ID",
-            "DATA_INTERFACE_TYPE_CODE",
-            "EAI_INTERFACE_DATE",
-            "APPLICATION_TRANSFER_FLAG"
+            "EAI_SEQ_ID", "DATA_INTERFACE_TYPE_CODE",
+            "EAI_INTERFACE_DATE", "APPLICATION_TRANSFER_FLAG"
         ]
         
         # 사용자가 지정한 컬럼들 추가
@@ -306,10 +304,15 @@ class ColumnMapper:
         # 컬럼들을 2개씩 그룹화하여 포매팅
         formatted_parts = []
         for i in range(0, len(sql_parts), 2):
+            pair = []
+            pair.append(sql_parts[i])
             if i + 1 < len(sql_parts):
-                formatted_parts.append(f"    {sql_parts[i]}, {sql_parts[i+1]}")
-            else:
-                formatted_parts.append(f"    {sql_parts[i]}")
+                pair.append(sql_parts[i+1])
+            formatted_parts.append(f"    {', '.join(pair)}")
+        
+        # 마지막 쉼표 제거를 위해 마지막 줄만 따로 처리
+        if formatted_parts:
+            formatted_parts[-1] = formatted_parts[-1].rstrip(',')
         
         # 기본 쿼리가 있으면 합치고, 없으면 컬럼 목록만 반환
         if base_query:
@@ -356,10 +359,15 @@ class ColumnMapper:
         # 값들을 2개씩 그룹화하여 포매팅
         formatted_parts = []
         for i in range(0, len(sql_parts), 2):
+            pair = []
+            pair.append(sql_parts[i])
             if i + 1 < len(sql_parts):
-                formatted_parts.append(f"    {sql_parts[i]}, {sql_parts[i+1]}")
-            else:
-                formatted_parts.append(f"    {sql_parts[i]}")
+                pair.append(sql_parts[i+1])
+            formatted_parts.append(f"    {', '.join(pair)}")
+        
+        # 마지막 쉼표 제거를 위해 마지막 줄만 따로 처리
+        if formatted_parts:
+            formatted_parts[-1] = formatted_parts[-1].rstrip(',')
         
         # 기본 쿼리가 있으면 합치고, 없으면 값 목록만 반환
         if base_query:
@@ -389,10 +397,16 @@ class ColumnMapper:
         # 컬럼들을 2개씩 그룹화하여 포매팅
         formatted_parts = []
         for i in range(0, len(columns), 2):
+            pair = []
+            pair.append(columns[i])
             if i + 1 < len(columns):
-                formatted_parts.append(f"    {columns[i]}, {columns[i+1]}")
-            else:
-                formatted_parts.append(f"    {columns[i]}")
+                pair.append(columns[i+1])
+            formatted_parts.append(f"    {', '.join(pair)}")
+        
+        # 마지막 쉼표 제거를 위해 마지막 줄만 따로 처리
+        if formatted_parts:
+            formatted_parts[-1] = formatted_parts[-1].rstrip(',')
+        
         sql += ",\n".join(formatted_parts)
         sql += f"\nFROM {table_info['owner']}.{table_info['table_name']}"
         return sql
@@ -429,10 +443,15 @@ class ColumnMapper:
         # 컬럼들을 2개씩 그룹화하여 포매팅
         formatted_parts = []
         for i in range(0, len(sql_parts), 2):
+            pair = []
+            pair.append(sql_parts[i])
             if i + 1 < len(sql_parts):
-                formatted_parts.append(f"    {sql_parts[i]}, {sql_parts[i+1]}")
-            else:
-                formatted_parts.append(f"    {sql_parts[i]}")
+                pair.append(sql_parts[i+1])
+            formatted_parts.append(f"    {', '.join(pair)}")
+        
+        # 마지막 쉼표 제거를 위해 마지막 줄만 따로 처리
+        if formatted_parts:
+            formatted_parts[-1] = formatted_parts[-1].rstrip(',')
         
         # SQL 문 조합
         if base_query:
@@ -536,7 +555,7 @@ class ColumnMapper:
             
             # XML 태그 생성
             attr_str = ' '.join(f'{k}="{v}"' for k, v in attrs.items())
-            xml_parts.append(f'    <field {attr_str}/>')
+            xml_parts.append(f'<field {attr_str}/>')
         
         xml_parts.append('</fields>')
         return '\n'.join(xml_parts)
