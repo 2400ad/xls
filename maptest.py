@@ -260,20 +260,20 @@ class ColumnMapper:
         """송신 SQL 생성"""
         if not self.send_mapping or not self.send_table_info:
             return "송신 테이블 정보가 설정되지 않았습니다."
-        return generate_full_send_sql(self.send_table_info, self.send_mapping, self.send_columns)
+        return self.generate_full_send_sql(self.send_table_info, self.send_mapping, self.send_columns)
 
     def generate_recv_sql(self):
         """수신 SQL 생성"""
         if not self.recv_mapping or not self.recv_table_info:
             return "수신 테이블 정보가 설정되지 않았습니다."
-        return generate_full_receive_sql(self.recv_table_info, self.recv_mapping, self.recv_columns)
+        return self.generate_full_receive_sql(self.recv_table_info, self.recv_mapping, self.recv_columns)
 
     def generate_field_xml(self):
         """필드 XML 생성"""
         if not self.send_mapping:
             return "송신 테이블 정보가 설정되지 않았습니다."
-        xml = generate_field_xml(self.send_mapping, self.send_columns)
-        return format_field_xml(xml)
+        xml = self.generate_field_xml(self.send_mapping, self.send_columns)
+        return self.format_field_xml(xml)
 
     def generate_receive_insert_into(self, column_list, columns_info, base_query):
         """수신 INSERT 문의 INTO 부분 생성
@@ -358,180 +358,147 @@ class ColumnMapper:
             return f"{base_query}{values_sql}"
         return values_sql
 
-def generate_full_send_sql(table_info, column_list, columns_info):
-    """전체 송신 SQL 생성 (SELECT 문 전체)
-    Args:
-        table_info: 테이블 정보 {'owner': 스키마명, 'table_name': 테이블명}
-        column_list: 컬럼 목록
-        columns_info: 컬럼 정보 딕셔너리
-    
-    Returns:
-        완성된 SELECT 문
-    """
-    # 기본 쿼리 생성
-    base_query = f"SELECT "
-    
-    # 컬럼 부분 생성
-    columns_part = generate_send_sql(column_list, columns_info, base_query)
-    
-    # FROM 절 추가
-    if table_info['owner']:
-        from_clause = f"\nFROM {table_info['owner']}.{table_info['table_name']}"
-    else:
-        from_clause = f"\nFROM {table_info['table_name']}"
-    
-    return f"{columns_part}{from_clause}"
+    def generate_full_send_sql(self, table_info, column_list, columns_info):
+        """전체 송신 SQL 생성 (SELECT 문 전체)
+        
+        Args:
+            table_info: 테이블 정보 {'owner': 스키마명, 'table_name': 테이블명}
+            column_list: 컬럼 목록
+            columns_info: 컬럼 정보 딕셔너리
+        
+        Returns:
+            완성된 SELECT 문
+        """
+        columns = []
+        for col in column_list:
+            if col in columns_info:
+                columns.append(col)
+        
+        if not columns:
+            return ""
+        
+        sql = f"SELECT {', '.join(columns)}\n"
+        sql += f"FROM {table_info['owner']}.{table_info['table_name']}"
+        return sql
 
-def generate_send_sql(column_list, columns_info, base_query):
-    """송신 SQL 생성
-    Args:
-        column_list: 컬럼 목록
-        columns_info: 컬럼 정보 딕셔너리
-        base_query: 기본 쿼리 ($D$3에 해당)
-    
-    Returns:
-        생성된 SQL 문자열
-    """
-    # 필수 시스템 컬럼 추가 (항상 처음에 포함)
-    sql_parts = ["EAI_SEQ_ID", "DATA_INTERFACE_TYPE_CODE"]
-    
-    # 사용자가 지정한 컬럼들 추가
-    for col in column_list:
-        if not col:  # 빈 컬럼은 건너뜀
-            continue
-            
-        if col not in columns_info:
-            continue
-            
-        col_info = columns_info[col]
-        # DATE 타입인 경우 TO_CHAR 변환 추가
-        if col_info['type'] == 'DATE':
-            sql_parts.append(f"TO_CHAR({col}, 'YYYYMMDDHH24MISS')")
-        else:
+    def generate_send_sql(self, column_list, columns_info, base_query):
+        """송신 SQL 생성
+        
+        Args:
+            column_list: 컬럼 목록
+            columns_info: 컬럼 정보 딕셔너리
+            base_query: 기본 쿼리 ($D$3에 해당)
+        
+        Returns:
+            생성된 SQL 문자열
+        """
+        # 컬럼 목록 검증
+        valid_columns = []
+        for col in column_list:
+            if col in columns_info:
+                valid_columns.append(col)
+            else:
+                print(f"Warning: Column {col} not found in columns_info")
+        
+        if not valid_columns:
+            return ""
+        
+        # SQL 생성
+        sql_parts = []
+        for col in valid_columns:
             sql_parts.append(col)
-    
-    # 컬럼들을 쉼표로 구분하여 합침
-    columns_sql = ", ".join(sql_parts)
-    
-    # 기본 쿼리가 있으면 합치고, 없으면 컬럼 목록만 반환
-    if base_query:
-        return f"{base_query}{columns_sql}"
-    return columns_sql
-
-def generate_full_receive_sql(table_info, column_list, columns_info):
-    """전체 수신 INSERT 문 생성
-    Args:
-        table_info: 테이블 정보 {'owner': 스키마명, 'table_name': 테이블명}
-        column_list: 컬럼 목록
-        columns_info: 컬럼 정보 딕셔너리
-    
-    Returns:
-        완성된 INSERT 문
-    """
-    # 기본 쿼리
-    base_query = "INSERT INTO "
-    if table_info['owner']:
-        base_query += f"{table_info['owner']}."
-    base_query += f"{table_info['table_name']} ("
-    
-    # INTO 절 생성
-    into_part = ColumnMapper().generate_receive_insert_into(column_list, columns_info, base_query)
-    
-    # VALUES 절 생성
-    values_part = ColumnMapper().generate_receive_insert_values(column_list, columns_info, "VALUES (")
-    
-    return f"{into_part})\n{values_part})"
-
-def generate_field_xml(column_list, columns_info):
-    """필드 XML 생성
-    Args:
-        column_list: 컬럼 목록
-        columns_info: 컬럼 정보 딕셔너리
-    
-    Returns:
-        XML 문자열
-    """
-    # 필드 개수 계산 (field가 포함된 컬럼 수)
-    field_count = len([col_name for col_name in column_list if col_name.strip()])
-    
-    # XML 라인 리스트
-    xml_lines = []
-    
-    # 헤더 추가
-    xml_lines.append(f'<fields count="{field_count}">')
-    
-    # 일반 필드 처리
-    for col_name in column_list:
-        col_info = columns_info.get(col_name)
-        if not col_info:
-            continue
-            
-        # 기본 속성
-        attrs = {
-            'key': '0',
-            'nofetch': '0',
-            'name': col_name
-        }
         
-        # 타입별 추가 속성
-        col_type = col_info['type']
-        col_size = col_info.get('size', 0)
+        sql = "SELECT " + ", ".join(sql_parts)
         
+        # 기본 쿼리가 있으면 FROM절 추가
+        if base_query:
+            sql += f"\nFROM ({base_query})"
+        
+        return sql
+
+    def generate_full_receive_sql(self, table_info, column_list, columns_info):
+        """전체 수신 INSERT 문 생성
+        
+        Args:
+            table_info: 테이블 정보 {'owner': 스키마명, 'table_name': 테이블명}
+            column_list: 컬럼 목록
+            columns_info: 컬럼 정보 딕셔너리
+        
+        Returns:
+            완성된 INSERT 문
+        """
+        columns = []
+        for col in column_list:
+            if col in columns_info:
+                columns.append(col)
+        
+        if not columns:
+            return ""
+        
+        sql = f"INSERT INTO {table_info['owner']}.{table_info['table_name']}\n"
+        sql += f"({', '.join(columns)})\n"
+        sql += f"VALUES ({', '.join([':' + str(i+1) for i in range(len(columns))])})"
+        return sql
+
+    def generate_field_xml(self, column_list, columns_info):
+        """필드 XML 생성
+        
+        Args:
+            column_list: 컬럼 목록
+            columns_info: 컬럼 정보 딕셔너리
+        
+        Returns:
+            XML 문자열
+        """
+        xml_parts = []
+        xml_parts.append('<?xml version="1.0" encoding="UTF-8"?>')
+        xml_parts.append('<interface>')
+        xml_parts.append('  <common>')
+        xml_parts.append('    <system>')
+        xml_parts.append('      <type>DB</type>')
+        xml_parts.append('      <code></code>')
+        xml_parts.append('      <name></name>')
+        xml_parts.append('    </system>')
+        xml_parts.append('    <service>')
+        xml_parts.append('      <code></code>')
+        xml_parts.append('      <name></name>')
+        xml_parts.append('      <sql></sql>')
+        xml_parts.append('    </service>')
+        xml_parts.append('  </common>')
+        xml_parts.append('  <fields>')
+        
+        for i, col in enumerate(column_list, 1):
+            if col in columns_info:
+                info = columns_info[col]
+                xml_parts.append('    <field>')
+                xml_parts.append(f'      <id>{i}</id>')
+                xml_parts.append(f'      <name>{col}</name>')
+                xml_parts.append(f'      <type>{info["type"]}</type>')
+                xml_parts.append(f'      <size>{info["size"]}</size>')
+                xml_parts.append(f'      <nullable>{info["nullable"]}</nullable>')
+                xml_parts.append('      <description></description>')
+                xml_parts.append('    </field>')
+        
+        xml_parts.append('  </fields>')
+        xml_parts.append('</interface>')
+        
+        return '\n'.join(xml_parts)
+
+    def format_field_xml(self, xml_str):
+        """XML 문자열을 보기 좋게 포맷팅
+        
+        Args:
+            xml_str: XML 문자열
+        Returns:
+            들여쓰기가 적용된 XML 문자열
+        """
         try:
-            size = int(col_size)
-        except (ValueError, TypeError):
-            size = 0
-            
-        if col_type in ['NVARCHAR', 'NCHAR', 'NVARCHAR2']:
-            if size * 3 > 1024:
-                attrs['length'] = str(size * 3)
-        elif col_type == 'BLOB':
-            attrs.update({
-                'length': '1000000',
-                'type': 'blob',
-                'length_info': '1000000',
-                'start_info': '1',
-                'attr': 'bin'
-            })
-        elif col_type == 'CLOB':
-            attrs.update({
-                'length': '3000000',
-                'type': 'clob',
-                'length_info': '0',
-                'start_info': '0',
-                'attr': 'bin'
-            })
-        elif size > 1024:
-            attrs['length'] = str(size)
-        
-        # XML 태그 생성
-        attr_str = ' '.join(f'{k}="{v}"' for k, v in attrs.items())
-        xml_lines.append(f'<field {attr_str}/>')
-    
-    # 닫는 태그 추가
-    xml_lines.append('</fields>')
-    
-    return '\n'.join(xml_lines)
-
-def format_field_xml(xml_str):
-    """XML 문자열을 보기 좋게 포맷팅
-    Args:
-        xml_str: XML 문자열
-    Returns:
-        들여쓰기가 적용된 XML 문자열
-    """
-    lines = xml_str.split('\n')
-    indent = 0
-    formatted_lines = []
-    
-    for line in lines:
-        if line.strip().startswith('</'):  # 닫는 태그
-            indent -= 1
-        formatted_lines.append('  ' * indent + line.strip())
-        if not (line.strip().endswith('/>') or line.strip().startswith('</')):  # 여는 태그
-            indent += 1
-    
-    return '\n'.join(formatted_lines)
+            import xml.dom.minidom
+            dom = xml.dom.minidom.parseString(xml_str)
+            return dom.toprettyxml()
+        except Exception as e:
+            print(f"XML 포맷팅 중 오류 발생: {str(e)}")
+            return xml_str
 
 if __name__ == "__main__":
     # 테스트를 위한 DB 연결 정보
