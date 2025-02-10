@@ -392,29 +392,31 @@ class ColumnMapper:
         Returns:
             생성된 SQL 문자열
         """
-        # 컬럼 목록 검증
-        valid_columns = []
+        # 필수 시스템 컬럼 추가 (항상 처음에 포함)
+        sql_parts = ["EAI_SEQ_ID", "DATA_INTERFACE_TYPE_CODE"]
+        
+        # 사용자가 지정한 컬럼들 추가
         for col in column_list:
-            if col in columns_info:
-                valid_columns.append(col)
+            if not col:  # 빈 컬럼은 건너뜀
+                continue
+                
+            if col not in columns_info:
+                continue
+                
+            col_info = columns_info[col]
+            # DATE 타입인 경우 TO_CHAR 변환 추가
+            if col_info['type'] == 'DATE':
+                sql_parts.append(f"TO_CHAR({col}, 'YYYYMMDDHH24MISS')")
             else:
-                print(f"Warning: Column {col} not found in columns_info")
+                sql_parts.append(col)
         
-        if not valid_columns:
-            return ""
+        # 컬럼들을 쉼표로 구분하여 합침
+        columns_sql = ", ".join(sql_parts)
         
-        # SQL 생성
-        sql_parts = []
-        for col in valid_columns:
-            sql_parts.append(col)
-        
-        sql = "SELECT " + ", ".join(sql_parts)
-        
-        # 기본 쿼리가 있으면 FROM절 추가
+        # 기본 쿼리가 있으면 합치고, 없으면 컬럼 목록만 반환
         if base_query:
-            sql += f"\nFROM ({base_query})"
-        
-        return sql
+            return f"{base_query}{columns_sql}"
+        return columns_sql
 
     def generate_full_receive_sql(self, table_info, column_list, columns_info):
         """전체 수신 INSERT 문 생성
@@ -427,18 +429,19 @@ class ColumnMapper:
         Returns:
             완성된 INSERT 문
         """
-        columns = []
-        for col in column_list:
-            if col in columns_info:
-                columns.append(col)
+        # 기본 쿼리
+        base_query = "INSERT INTO "
+        if table_info['owner']:
+            base_query += f"{table_info['owner']}."
+        base_query += f"{table_info['table_name']} ("
         
-        if not columns:
-            return ""
+        # INTO 절 생성 (기본 시스템 컬럼 포함)
+        into_part = self.generate_receive_insert_into(column_list, columns_info, base_query)
         
-        sql = f"INSERT INTO {table_info['owner']}.{table_info['table_name']}\n"
-        sql += f"({', '.join(columns)})\n"
-        sql += f"VALUES ({', '.join([':' + str(i+1) for i in range(len(columns))])})"
-        return sql
+        # VALUES 절 생성 (기본 시스템 값 포함)
+        values_part = self.generate_receive_insert_values(column_list, columns_info, "VALUES (")
+        
+        return f"{into_part})\n{values_part})"
 
     def generate_field_xml(self, column_list, columns_info):
         """필드 XML 생성
@@ -450,38 +453,68 @@ class ColumnMapper:
         Returns:
             XML 문자열
         """
+        # 필수 시스템 컬럼 추가
+        all_columns = ["EAI_SEQ_ID", "DATA_INTERFACE_TYPE_CODE"] + [col for col in column_list if col]
+        
+        # 필드 개수 계산
+        field_count = len(all_columns)
+        
         xml_parts = []
-        xml_parts.append('<?xml version="1.0" encoding="UTF-8"?>')
-        xml_parts.append('<interface>')
-        xml_parts.append('  <common>')
-        xml_parts.append('    <system>')
-        xml_parts.append('      <type>DB</type>')
-        xml_parts.append('      <code></code>')
-        xml_parts.append('      <name></name>')
-        xml_parts.append('    </system>')
-        xml_parts.append('    <service>')
-        xml_parts.append('      <code></code>')
-        xml_parts.append('      <name></name>')
-        xml_parts.append('      <sql></sql>')
-        xml_parts.append('    </service>')
-        xml_parts.append('  </common>')
-        xml_parts.append('  <fields>')
+        xml_parts.append(f'<fields count="{field_count}">')
         
-        for i, col in enumerate(column_list, 1):
+        # 필드 생성
+        for col in all_columns:
+            # 기본 속성
+            attrs = {
+                'key': '0',
+                'nofetch': '0',
+                'name': col
+            }
+            
+            # 시스템 컬럼이 아닌 경우에만 추가 속성 검사
             if col in columns_info:
-                info = columns_info[col]
-                xml_parts.append('    <field>')
-                xml_parts.append(f'      <id>{i}</id>')
-                xml_parts.append(f'      <name>{col}</name>')
-                xml_parts.append(f'      <type>{info["type"]}</type>')
-                xml_parts.append(f'      <size>{info["size"]}</size>')
-                xml_parts.append(f'      <nullable>{info["nullable"]}</nullable>')
-                xml_parts.append('      <description></description>')
-                xml_parts.append('    </field>')
+                col_info = columns_info[col]
+                col_type = col_info['type']
+                
+                try:
+                    size = int(col_info['size'])
+                except (ValueError, TypeError):
+                    size = 0
+                
+                # NVARCHAR, NCHAR, NVARCHAR2 타입 처리
+                if col_type in ['NVARCHAR', 'NCHAR', 'NVARCHAR2']:
+                    if size * 3 > 1024:
+                        attrs['length'] = str(size * 3)
+                
+                # BLOB 타입 처리
+                elif col_type == 'BLOB':
+                    attrs.update({
+                        'length': '1000000',
+                        'type': 'blob',
+                        'length_info': '1000000',
+                        'start_info': '1',
+                        'attr': 'bin'
+                    })
+                
+                # CLOB 타입 처리
+                elif col_type == 'CLOB':
+                    attrs.update({
+                        'length': '3000000',
+                        'type': 'clob',
+                        'length_info': '0',
+                        'start_info': '0',
+                        'attr': 'bin'
+                    })
+                
+                # 기타 타입의 크기가 1024 초과인 경우
+                elif size > 1024:
+                    attrs['length'] = str(size)
+            
+            # XML 태그 생성
+            attr_str = ' '.join(f'{k}="{v}"' for k, v in attrs.items())
+            xml_parts.append(f'    <field {attr_str}/>')
         
-        xml_parts.append('  </fields>')
-        xml_parts.append('</interface>')
-        
+        xml_parts.append('</fields>')
         return '\n'.join(xml_parts)
 
     def format_field_xml(self, xml_str):
@@ -602,7 +635,7 @@ if __name__ == "__main__":
             print(f"수신 SQL 생성 실패: {str(e)}")
         
         print("\n" + "="*50)
-        print("8. 필드 XML 생성3")
+        print("8. 필드 XML 생성")
         print("="*50)
         try:
             field_xml = mapper.generate_field_xml_from_mapping()
