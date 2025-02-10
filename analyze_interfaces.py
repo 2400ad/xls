@@ -43,13 +43,18 @@ def read_interface_block(ws, start_col):
         recv_val = ws.cell(row=row, column=start_col+1).value
         comment_val = ws.cell(row=row, column=start_col+2).value
         
-        # 둘 다 빈 값이면 종료
+        # 송신과 수신 컬럼이 모두 없는 경우에만 종료
         if not send_val and not recv_val:
-            break
+            # 이전 행까지 모두 비어있는지 확인
+            prev_send = ws.cell(row=row-1, column=start_col).value
+            prev_recv = ws.cell(row=row-1, column=start_col+1).value
+            if not prev_send and not prev_recv:
+                break
             
-        if send_val:
+        # 송신이나 수신 중 하나라도 있으면 추가
+        if send_val is not None:  # 빈 문자열도 값으로 처리
             send_columns.append(send_val)
-        if recv_val:
+        if recv_val is not None:  # 빈 문자열도 값으로 처리
             recv_columns.append(recv_val)
         if comment_val:
             comments.append(comment_val)
@@ -104,11 +109,24 @@ def analyze_excel():
                 print(f"  {i+1}. {col}")
             
             print("\n[컬럼 매핑]")
-            for i in range(min(len(interface['send_columns']), len(interface['recv_columns']))):
+            # 송신과 수신 컬럼을 별도로 출력
+            print("송신 컬럼:")
+            for i, col in enumerate(interface['send_columns']):
+                print(f"  {i+1}. {col}")
+                
+            print("\n수신 컬럼:")
+            for i, col in enumerate(interface['recv_columns']):
+                print(f"  {i+1}. {col}")
+                
+            print("\n매핑 관계:")
+            # 실제 매핑 관계만 출력
+            mapping_count = min(len(interface['send_columns']), len(interface['recv_columns']))
+            for i in range(mapping_count):
                 comment = interface['comments'][i] if i < len(interface['comments']) else ""
-                print(f"  {interface['send_columns'][i]} -> {interface['recv_columns'][i]}")
-                if comment:
-                    print(f"    설명: {comment}")
+                if interface['recv_columns'][i]:  # 수신 컬럼이 있는 경우만 매핑 표시
+                    print(f"  {interface['send_columns'][i]} -> {interface['recv_columns'][i]}")
+                    if comment:
+                        print(f"    설명: {comment}")
             print()
             
     except Exception as e:
