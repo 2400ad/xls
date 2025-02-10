@@ -4,7 +4,7 @@ git status
 echo.
 
 echo 모든 변경 사항 추가
-git add .
+git add -A
 echo.
 
 REM echo 커밋 메시지와 함께 커밋:
