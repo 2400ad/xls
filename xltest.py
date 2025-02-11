@@ -132,9 +132,11 @@ def write_interface_result_to_sheet(wb, interface_info, results, interface_num):
     
     # 스타일 정의
     header_fill = PatternFill(start_color='366092', end_color='366092', fill_type='solid')
-    header_font = Font(color='FFFFFF', bold=True)
-    normal_font = Font(name='맑은 고딕')
+    header_font = Font(color='FFFFFF', bold=True, size=12)  # 헤더 폰트 크기 12
+    normal_font = Font(name='맑은 고딕', size=10)  # 일반 텍스트 폰트 크기 10
+    bold_font = Font(bold=True, size=10)  # 굵은 글씨 폰트 크기 10
     center_alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    left_alignment = Alignment(horizontal='left', vertical='center', wrap_text=True)
     border = Border(left=Side(style='thin'), right=Side(style='thin'),
                    top=Side(style='thin'), bottom=Side(style='thin'))
     
@@ -144,6 +146,7 @@ def write_interface_result_to_sheet(wb, interface_info, results, interface_num):
     ws['A1'].fill = header_fill
     ws['A1'].font = header_font
     ws['A1'].alignment = center_alignment
+    ws.row_dimensions[1].height = 25
     
     info_headers = ['송신 테이블', '수신 테이블']
     for idx, header in enumerate(info_headers, 2):
@@ -154,7 +157,8 @@ def write_interface_result_to_sheet(wb, interface_info, results, interface_num):
         value = f"{interface_info['send' if '송신' in header else 'recv']['owner']}.{interface_info['send' if '송신' in header else 'recv']['table_name']}"
         ws.merge_cells(f'B{idx}:D{idx}')
         ws[f'B{idx}'] = value
-        ws[f'B{idx}'].alignment = Alignment(horizontal='left', vertical='center')
+        ws[f'B{idx}'].alignment = left_alignment
+        ws.row_dimensions[idx].height = 25
     
     # 2. 컬럼 비교 결과 섹션
     ws['A4'] = '컬럼 비교 결과'
@@ -162,14 +166,16 @@ def write_interface_result_to_sheet(wb, interface_info, results, interface_num):
     ws['A4'].font = header_font
     ws.merge_cells('A4:D4')
     ws['A4'].alignment = center_alignment
+    ws.row_dimensions[4].height = 25
     
     comparison_headers = ['송신 컬럼', '수신 컬럼', '비교 결과', '상태']
     for idx, header in enumerate(comparison_headers):
         col = chr(ord('A') + idx)
         ws[f'{col}5'] = header
         ws[f'{col}5'].fill = PatternFill(start_color='D9E1F2', end_color='D9E1F2', fill_type='solid')
-        ws[f'{col}5'].font = Font(bold=True)
+        ws[f'{col}5'].font = bold_font  # 굵은 글씨 폰트 적용
         ws[f'{col}5'].alignment = center_alignment
+    ws.row_dimensions[5].height = 25
     
     row = 6
     if results['comparison']:
@@ -184,6 +190,18 @@ def write_interface_result_to_sheet(wb, interface_info, results, interface_num):
                                     end_color='FF9999' if comp.get('errors') else '99FF99', 
                                     fill_type='solid')
             ws[f'D{row}'].fill = status_fill
+            
+            # 각 셀의 alignment 설정
+            for col in ['A', 'B', 'C', 'D']:
+                ws[f'{col}{row}'].alignment = left_alignment if col == 'C' else center_alignment
+            
+            # 행 높이 자동 조절
+            max_lines = max(
+                len(str(comp.get('send_column', '')).split('\n')),
+                len(str(comp.get('recv_column', '')).split('\n')),
+                len(comp.get('errors', []))
+            )
+            ws.row_dimensions[row].height = max(25, min(15 * max_lines, 100))  # 최소 25, 최대 100
             row += 1
     
     # 3. SQL 섹션
@@ -193,20 +211,31 @@ def write_interface_result_to_sheet(wb, interface_info, results, interface_num):
     ws[f'A{current_row}'].font = header_font
     ws.merge_cells(f'A{current_row}:D{current_row}')
     ws[f'A{current_row}'].alignment = center_alignment
+    ws.row_dimensions[current_row].height = 25
     
     # 송신 SQL
     current_row += 1
     ws[f'A{current_row}'] = '송신 SQL'
+    ws[f'A{current_row}'].alignment = center_alignment
     ws.merge_cells(f'B{current_row}:D{current_row}')
     ws[f'B{current_row}'] = results['send_sql']
-    ws[f'B{current_row}'].alignment = Alignment(wrap_text=True)
+    ws[f'B{current_row}'].font = normal_font  # 일반 폰트 적용
+    ws[f'B{current_row}'].alignment = left_alignment
+    # SQL 문의 줄 수에 따라 행 높이 조절
+    lines = len(str(results['send_sql']).split('\n'))
+    ws.row_dimensions[current_row].height = max(25, min(15 * lines, 400))  # 최소 25, 최대 400
     
     # 수신 SQL
     current_row += 1
     ws[f'A{current_row}'] = '수신 SQL'
+    ws[f'A{current_row}'].alignment = center_alignment
     ws.merge_cells(f'B{current_row}:D{current_row}')
     ws[f'B{current_row}'] = results['recv_sql']
-    ws[f'B{current_row}'].alignment = Alignment(wrap_text=True)
+    ws[f'B{current_row}'].font = normal_font  # 일반 폰트 적용
+    ws[f'B{current_row}'].alignment = left_alignment
+    # SQL 문의 줄 수에 따라 행 높이 조절
+    lines = len(str(results['recv_sql']).split('\n'))
+    ws.row_dimensions[current_row].height = max(25, min(15 * lines, 400))  # 최소 25, 최대 400
     
     # 4. XML 섹션
     current_row += 2
@@ -215,11 +244,16 @@ def write_interface_result_to_sheet(wb, interface_info, results, interface_num):
     ws[f'A{current_row}'].font = header_font
     ws.merge_cells(f'A{current_row}:D{current_row}')
     ws[f'A{current_row}'].alignment = center_alignment
+    ws.row_dimensions[current_row].height = 25
     
     current_row += 1
     ws.merge_cells(f'A{current_row}:D{current_row}')
     ws[f'A{current_row}'] = results['field_xml']
-    ws[f'A{current_row}'].alignment = Alignment(wrap_text=True)
+    ws[f'A{current_row}'].font = normal_font  # 일반 폰트 적용
+    ws[f'A{current_row}'].alignment = left_alignment
+    # XML 문의 줄 수에 따라 행 높이 조절
+    lines = len(str(results['field_xml']).split('\n'))
+    ws.row_dimensions[current_row].height = max(25, min(15 * lines, 400))  # 최소 25, 최대 400
     
     # 열 너비 조정
     ws.column_dimensions['A'].width = 20
