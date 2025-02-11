@@ -114,7 +114,7 @@ class ColumnMapper:
 			return [{"error": "송신 테이블 정보가 설정되지 않았습니다."}]
 
 		self.comparison_results = []
-		has_error = False
+		has_warning = False
 
 		# 송신 컬럼 수와 수신 매핑 리스트 길이 맞추기
 		recv_mapping = self.recv_mapping if self.recv_mapping else [""] * len(self.send_mapping)
@@ -132,58 +132,59 @@ class ColumnMapper:
 				'size_diff': None,
 				'size_over': None,
 				'nullable_diff': None,
-				'errors': []
+				'errors': [],
+				'warnings': []
 			}
 
 			# 송신 컬럼 정보 확인
 			if not send_col:
 				result['errors'].append("송신 컬럼이 비어있습니다.")
-				has_error = True
 			elif send_col not in self.send_columns:
 				result['errors'].append(f"송신 테이블에 {send_col} 컬럼이 존재하지 않습니다.")
-				has_error = True
 			else:
 				result['send_info'] = self.send_columns[send_col]
 
 			# 수신 컬럼이 비어있는 경우는 정상적인 상황으로 처리
 			if not recv_col:
-				result['errors'].append("수신 매핑이 설정되지 않았습니다 (선택적 수신)")
+				result['warnings'].append("수신 매핑이 설정되지 않았습니다 (선택적 수신)")
 			else:
 				if not self.recv_columns:
 					result['errors'].append("수신 테이블 정보가 설정되지 않았습니다.")
-					has_error = True
 				elif recv_col not in self.recv_columns:
 					result['errors'].append(f"수신 테이블에 {recv_col} 컬럼이 존재하지 않습니다.")
-					has_error = True
 				else:
 					result['recv_info'] = self.recv_columns[recv_col]
 					if result['send_info'] and result['recv_info']:
 						send_info = result['send_info']
 						recv_info = result['recv_info']
+						
 						# 타입 비교
 						type_diff = self.check_type_diff(send_info, recv_info)
 						if type_diff:
 							result['type_diff'] = type_diff
-							result['errors'].append(f"타입이 다릅니다: 송신({send_info['type']}) vs 수신({recv_info['type']})")
-							has_error = True
+							result['warnings'].append(f"타입이 다릅니다: 송신({send_info['type']}) vs 수신({recv_info['type']})")
+							has_warning = True
+							
 						# 크기 비교
 						size_diff = self.check_size_diff(send_info, recv_info)
 						if size_diff:
 							result['size_diff'] = size_diff
-							result['errors'].append(f"크기가 다릅니다: 송신({send_info['size']}) vs 수신({recv_info['size']})")
-							has_error = True
+							result['warnings'].append(f"크기가 다릅니다: {size_diff}")
+							has_warning = True
+							
 						# 1024 바이트 초과 여부 확인
 						size_over = self.check_size_over_1024(send_info)
 						if size_over:
 							result['size_over'] = size_over
-							result['errors'].append("송신 컬럼 크기가 1024 바이트를 초과합니다.")
-							has_error = True
+							result['warnings'].append("송신 컬럼 크기가 1024 바이트를 초과합니다.")
+							has_warning = True
+							
 						# Nullable 비교
 						nullable_diff = self.check_nullable_diff(send_info, recv_info)
 						if nullable_diff:
 							result['nullable_diff'] = nullable_diff
-							result['errors'].append(f"NULL 허용 여부가 다릅니다: 송신({send_info['nullable']}) vs 수신({recv_info['nullable']})")
-							has_error = True
+							result['warnings'].append(f"NULL 허용 여부가 다릅니다: 송신({send_info['nullable']}) vs 수신({recv_info['nullable']})")
+							has_warning = True
 
 			self.comparison_results.append(result)
 
@@ -202,17 +203,26 @@ class ColumnMapper:
 		return "칼럼 Type NG"
 
 	def check_size_diff(self, send, recv):
-		"""사이즈 차이 체크"""
+		"""크기 차이 체크"""
 		if not isinstance(send, dict) or not isinstance(recv, dict):
 			return "컬럼 정보 형식 오류"
 		if 'type' not in send or 'type' not in recv or 'size' not in send or 'size' not in recv:
-			return "컬럼 타입 또는 크기 정보 누락"
-		if send['type'] in ["NVARCHAR", "NCHAR", "NVARCHAR2"] or recv['type'] in ["NVARCHAR", "NCHAR", "NVARCHAR2"]:
-			return "NCHAR TYPE"
-		if send['type'] in ["BLOB", "CLOB"] or recv['type'] in ["BLOB", "CLOB"]:
-			return "LOB TYPE"
-		if send['size'] != recv['size']:
-			return "칼럼 Size NG"
+			return "컬럼 크기 정보 누락"
+			
+		# DATE 타입이 포함된 경우 크기 비교하지 않음
+		if 'DATE' in (send['type'], recv['type']):
+			return ""
+			
+		# VARCHAR 계열 타입끼리만 크기 비교
+		if (send['type'] in ["VARCHAR", "VARCHAR2", "CHAR"]) and (recv['type'] in ["VARCHAR", "VARCHAR2", "CHAR"]):
+			try:
+				send_size = int(send['size'])
+				recv_size = int(recv['size'])
+				if send_size > recv_size:
+					return f"송신({send_size}) > 수신({recv_size})"
+				return ""
+			except ValueError:
+				return "크기 변환 오류"
 		return ""
 
 	def check_size_over_1024(self, col_info):
@@ -220,7 +230,8 @@ class ColumnMapper:
 		if not isinstance(col_info, dict):
 			return "컬럼 정보 형식 오류"
 		if 'type' not in col_info or 'size' not in col_info:
-			return "컬럼 타입 또는 크기 정보 누락"
+			return "컬럼 크기 정보 누락"
+			
 		if col_info['type'] in ["NVARCHAR", "NCHAR", "NVARCHAR2"]:
 			if float(col_info['size']) > 1024 / 3:
 				return "칼럼 Size > 1024"
@@ -260,11 +271,28 @@ class ColumnMapper:
 		return self.generate_full_receive_sql(self.recv_table_info, self.recv_mapping, self.recv_columns)
 
 	def generate_field_xml_from_mapping(self):
-		"""필드 XML 생성"""
-		if not self.send_mapping:
-			return "송신 테이블 정보가 설정되지 않았습니다."
-		xml = self.generate_field_xml(self.send_mapping, self.send_columns)
-		return self.format_field_xml(xml)
+		"""매핑 정보로부터 필드 XML 생성"""
+		if not self.send_mapping or not self.send_columns:
+			return ""
+		
+		lines = []
+		lines.append(f'<field count="{len(self.send_mapping)}">')
+		
+		for idx, send_col in enumerate(self.send_mapping, 1):
+			if send_col in self.send_columns:
+				col_info = self.send_columns[send_col]
+				recv_col = self.recv_mapping[idx-1] if idx <= len(self.recv_mapping) else ""
+				
+				lines.append(f'    <col{idx}>')
+				lines.append(f'        <length>{col_info["size"]}</length>')
+				lines.append(f'        <type>{col_info["type"]}</type>')
+				lines.append(f'        <name>{send_col}</name>')
+				if recv_col:
+					lines.append(f'        <mapping>{recv_col}</mapping>')
+				lines.append(f'    </col{idx}>')
+		
+		lines.append('</field>')
+		return '\n'.join(lines)
 
 	def generate_receive_insert_into(self, column_list, columns_info, base_query):
 		"""수신 INSERT 문의 INTO 부분 생성
@@ -413,37 +441,6 @@ class ColumnMapper:
 		into_part = self.generate_receive_insert_into(column_list, columns_info, "")
 		values_part = self.generate_receive_insert_values(column_list, columns_info, "")
 		return f"{base_query}\n{into_part}\n) VALUES (\n{values_part}\n)"
-
-	def generate_field_xml(self, column_list, columns_info):
-		"""필드 XML 생성
-		
-		Args:
-			column_list: 컬럼 목록
-			columns_info: 컬럼 정보 딕셔너리
-		
-		Returns:
-			XML 문자열
-		"""
-		all_columns = ["EAI_SEQ_ID", "DATA_INTERFACE_TYPE_CODE"] + [col for col in column_list if col]
-		field_count = len(all_columns)
-		xml_parts = []
-		xml_parts.append(f'<fields count="{field_count}">')
-		for col in all_columns:
-			xml_parts.append(f'    <field name="{col}" />')
-		xml_parts.append('</fields>')
-		return '\n'.join(xml_parts)
-
-	def format_field_xml(self, xml_str):
-		"""XML 문자열을 보기 좋게 포맷팅
-		
-		Args:
-			xml_str: XML 문자열
-		Returns:
-			들여쓰기가 적용된 XML 문자열
-		"""
-		import xml.dom.minidom
-		dom = xml.dom.minidom.parseString(xml_str)
-		return dom.toprettyxml()
 
 if __name__ == "__main__":
 	# 테스트를 위한 DB 연결 정보

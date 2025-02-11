@@ -125,10 +125,11 @@ def process_interface(interface_info, mapper):
 
 def write_interface_result_to_sheet(wb, interface_info, results, interface_num):
     """각 인터페이스의 결과를 새로운 시트에 기록합니다."""
-    sheet_name = f'인터페이스_{interface_num}'
+    sheet_name = f'Interface_{interface_num}'
     if sheet_name in wb.sheetnames:
-        wb.remove(wb[sheet_name])
-    ws = wb.create_sheet(sheet_name)
+        ws = wb[sheet_name]
+    else:
+        ws = wb.create_sheet(sheet_name)
     
     # 스타일 정의
     header_fill = PatternFill(start_color='366092', end_color='366092', fill_type='solid')
@@ -199,13 +200,22 @@ def write_interface_result_to_sheet(wb, interface_info, results, interface_num):
             ws[f'H{row}'] = recv_info.get('nullable', '')
             
             # 비교 결과와 상태
-            ws[f'I{row}'] = '\n'.join(comp.get('errors', []))
-            ws[f'J{row}'] = '오류' if comp.get('errors') else '정상'
+            warnings = comp.get('warnings', [])
+            errors = comp.get('errors', [])
             
-            # 오류가 있으면 빨간색, 없으면 초록색
-            status_fill = PatternFill(start_color='FF9999' if comp.get('errors') else '99FF99', 
-                                    end_color='FF9999' if comp.get('errors') else '99FF99', 
-                                    fill_type='solid')
+            if errors:
+                ws[f'I{row}'] = '\n'.join(errors)
+                ws[f'J{row}'] = '오류'
+                status_fill = PatternFill(start_color='FF9999', end_color='FF9999', fill_type='solid')
+            elif warnings:
+                ws[f'I{row}'] = ''  # 경고 메시지는 표시하지 않음
+                ws[f'J{row}'] = '확인필요'
+                status_fill = PatternFill(start_color='FFD700', end_color='FFD700', fill_type='solid')  # 노란색
+            else:
+                ws[f'I{row}'] = ''
+                ws[f'J{row}'] = '정상'
+                status_fill = PatternFill(start_color='99FF99', end_color='99FF99', fill_type='solid')
+            
             ws[f'J{row}'].fill = status_fill
             
             # 각 셀의 alignment 설정과 폰트 적용
@@ -262,6 +272,10 @@ def write_interface_result_to_sheet(wb, interface_info, results, interface_num):
     
     current_row += 1
     ws.merge_cells(f'A{current_row}:D{current_row}')
+    if results.get('field_xml'):
+        xml_lines = results['field_xml'].split('\n')
+        if xml_lines and '<?xml' in xml_lines[0]:
+            results['field_xml'] = '\n'.join(xml_lines[1:]).strip()
     ws[f'A{current_row}'] = results['field_xml']
     ws[f'A{current_row}'].font = normal_font  # 일반 폰트 적용
     ws[f'A{current_row}'].alignment = left_alignment
