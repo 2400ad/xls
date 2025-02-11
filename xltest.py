@@ -1,6 +1,10 @@
 import openpyxl
 import ast
 from maptest import ColumnMapper
+import os
+import xml_parse1
+import maptest
+import openpyxl
 
 def read_interface_block(ws, start_col):
 	"""Excel에서 3컬럼 단위로 하나의 인터페이스 정보를 읽습니다.
@@ -141,5 +145,82 @@ def analyze_excel():
 		if 'wb' in locals():
 			wb.close()
 
+def load_interface_info(xml_path):
+	# bw.xml 파일을 파싱하여 인터페이스 정보를 반환합니다.
+	# xml_parse1 모듈에 parse_xml 함수가 있다고 가정합니다.
+	try:
+		interface_info = xml_parse1.parse_xml(xml_path)
+	except Exception as e:
+		print(f'XML 파싱 중 오류 발생: {e}')
+		interface_info = {}
+	return interface_info
+
+def get_mapping_instance(interface_info):
+	# 인터페이스 정보에 따라 매핑 인스턴스를 선택합니다.
+	# 여기서는 예시로 maptest 모듈의 ColumnMapper 클래스를 사용합니다.
+	return maptest.ColumnMapper()
+
+def process_interface_mapping(mapping_instance, interface_info):
+	# 매핑 인스턴스를 이용하여 각 기능(컬럼 비교, 송신 SQL, 수신 SQL, 필드 생성)을 실행합니다.
+	results = {}
+	try:
+		results['column_comparison'] = mapping_instance.compare_columns(interface_info)
+	except Exception as e:
+		results['column_comparison'] = f'Error: {e}'
+
+	try:
+		results['send_sql'] = mapping_instance.create_send_sql(interface_info)
+	except Exception as e:
+		results['send_sql'] = f'Error: {e}'
+
+	try:
+		results['recv_sql'] = mapping_instance.create_recv_sql(interface_info)
+	except Exception as e:
+		results['recv_sql'] = f'Error: {e}'
+
+	try:
+		results['field_creation'] = mapping_instance.create_fields(interface_info)
+	except Exception as e:
+		results['field_creation'] = f'Error: {e}'
+
+	return results
+
+def update_excel_with_results(xlsx_path, results):
+	# openpyxl을 사용하여 input.xlsx 파일에 '인터페이스 결과' 시트를 생성 혹은 초기화한 후 결과를 기록합니다.
+	try:
+		wb = openpyxl.load_workbook(xlsx_path)
+	except Exception as e:
+		print(f'Excel 파일 로드 실패: {e}')
+		return
+
+	if '인터페이스 결과' in wb.sheetnames:
+		ws = wb['인터페이스 결과']
+		# 기존 시트의 내용을 모두 지웁니다.
+		ws.delete_rows(1, ws.max_row)
+	else:
+		ws = wb.create_sheet('인터페이스 결과')
+
+	# 헤더 작성
+	ws.append(['항목', '결과'])
+
+	for key, value in results.items():
+		ws.append([key, value])
+
+	wb.save(xlsx_path)
+	print('Excel 업데이트 완료')
+
+def main():
+	# bw.xml과 input.xlsx 파일은 현재 작업 디렉토리에 있다고 가정
+	current_dir = os.getcwd()
+	xml_path = os.path.join(current_dir, 'bw.xml')
+	xlsx_path = os.path.join(current_dir, 'input.xlsx')
+
+	interface_info = load_interface_info(xml_path)
+	mapping_instance = get_mapping_instance(interface_info)
+	results = process_interface_mapping(mapping_instance, interface_info)
+	update_excel_with_results(xlsx_path, results)
+	print('인터페이스 매핑 및 Excel 업데이트 완료.')
+
 if __name__ == "__main__":
 	analyze_excel()
+	main()
