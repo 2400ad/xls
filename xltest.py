@@ -132,7 +132,7 @@ def write_interface_result_to_sheet(wb, interface_info, results, interface_num):
     
     # 스타일 정의
     header_fill = PatternFill(start_color='366092', end_color='366092', fill_type='solid')
-    header_font = Font(color='FFFFFF', bold=True, size=11)  # 헤더 폰트 크기 11
+    header_font = Font(color='FFFFFF', bold=True, size=9)  # 헤더 폰트 크기 9
     normal_font = Font(name='맑은 고딕', size=9)  # 일반 텍스트 폰트 크기 9
     bold_font = Font(bold=True, size=9)  # 굵은 글씨 폰트 크기 9
     center_alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
@@ -164,7 +164,7 @@ def write_interface_result_to_sheet(wb, interface_info, results, interface_num):
     ws['A4'] = '컬럼 비교 결과'
     ws['A4'].fill = header_fill
     ws['A4'].font = header_font
-    ws.merge_cells('A4:H4')  # H열까지 확장
+    ws.merge_cells('A4:J4')  # J열까지 확장
     ws['A4'].alignment = center_alignment
     ws.row_dimensions[4].height = 25
     
@@ -177,22 +177,26 @@ def write_interface_result_to_sheet(wb, interface_info, results, interface_num):
         ws[f'{col}5'].fill = PatternFill(start_color='D9E1F2', end_color='D9E1F2', fill_type='solid')
         ws[f'{col}5'].font = bold_font
         ws[f'{col}5'].alignment = center_alignment
-    ws.row_dimensions[5].height = 25
+        ws[f'{col}5'].border = border
+    ws.row_dimensions[5].height = 20
     
     row = 6
     if results['comparison']:
         for comp in results['comparison']:
+            send_info = comp.get('send_info', {})
+            recv_info = comp.get('recv_info', {})
+            
             # 송신 컬럼 정보
             ws[f'A{row}'] = comp.get('send_column', '')
-            ws[f'B{row}'] = comp.get('send_type', '')
-            ws[f'C{row}'] = comp.get('send_size', '')
-            ws[f'D{row}'] = comp.get('send_nullable', '')
+            ws[f'B{row}'] = send_info.get('type', '')
+            ws[f'C{row}'] = send_info.get('size', '')
+            ws[f'D{row}'] = send_info.get('nullable', '')
             
             # 수신 컬럼 정보
             ws[f'E{row}'] = comp.get('recv_column', '')
-            ws[f'F{row}'] = comp.get('recv_type', '')
-            ws[f'G{row}'] = comp.get('recv_size', '')
-            ws[f'H{row}'] = comp.get('recv_nullable', '')
+            ws[f'F{row}'] = recv_info.get('type', '')
+            ws[f'G{row}'] = recv_info.get('size', '')
+            ws[f'H{row}'] = recv_info.get('nullable', '')
             
             # 비교 결과와 상태
             ws[f'I{row}'] = '\n'.join(comp.get('errors', []))
@@ -204,19 +208,14 @@ def write_interface_result_to_sheet(wb, interface_info, results, interface_num):
                                     fill_type='solid')
             ws[f'J{row}'].fill = status_fill
             
-            # 각 셀의 alignment 설정
+            # 각 셀의 alignment 설정과 폰트 적용
             for col in range(ord('A'), ord('K')):
                 col_letter = chr(col)
-                ws[f'{col_letter}{row}'].alignment = left_alignment if col_letter == 'I' else center_alignment
-                ws[f'{col_letter}{row}'].font = normal_font
+                cell = ws[f'{col_letter}{row}']
+                cell.alignment = left_alignment if col_letter == 'I' else center_alignment
+                cell.font = normal_font
+                cell.border = border
             
-            # 행 높이 자동 조절
-            max_lines = max(
-                len(str(comp.get('send_column', '')).split('\n')),
-                len(str(comp.get('recv_column', '')).split('\n')),
-                len(comp.get('errors', []))
-            )
-            ws.row_dimensions[row].height = max(20, min(15 * max_lines, 100))  # 최소 20, 최대 100
             row += 1
     
     # 3. SQL 섹션
@@ -287,6 +286,18 @@ def write_interface_result_to_sheet(wb, interface_info, results, interface_num):
         for cell in row:
             cell.border = border
 
+def auto_adjust_row_heights(ws):
+    """행 높이를 자동으로 조정하는 함수"""
+    for row in range(1, ws.max_row + 1):
+        max_length = 1
+        for col in range(1, ws.max_column + 1):
+            cell = ws.cell(row=row, column=col)
+            if cell.value:
+                lines = str(cell.value).count('\n') + 1
+                max_length = max(max_length, lines)
+        # 기본 높이 20, 줄 수에 따라 높이 조정 (한 줄당 15픽셀)
+        ws.row_dimensions[row].height = max(20, min(15 * max_length, 100))
+
 def main():
     try:
         # input.xlsx 파일 로드
@@ -314,6 +325,7 @@ def main():
             
             # 결과를 output.xlsx의 새로운 시트에 기록
             write_interface_result_to_sheet(wb_output, interface_info, results, interface_count)
+            auto_adjust_row_heights(wb_output[wb_output.sheetnames[-1]])
             current_col += 3
         
         # 파일 저장
