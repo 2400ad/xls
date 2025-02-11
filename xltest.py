@@ -7,7 +7,8 @@ from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 def read_interface_block(ws, start_col):
     """Excel에서 3컬럼 단위로 하나의 인터페이스 정보를 읽습니다."""
     interface_info = {
-        'interface_name': ws.cell(row=2, column=start_col).value or '',  # 2행에서 인터페이스 이름 읽기
+        'interface_name': ws.cell(row=1, column=start_col).value or '',  # IF NAME (1행)
+        'interface_id': ws.cell(row=2, column=start_col).value or '',    # IF ID (2행)
         'send': {'owner': None, 'table_name': None, 'columns': [], 'db_info': None},
         'recv': {'owner': None, 'table_name': None, 'columns': [], 'db_info': None}
     }
@@ -127,6 +128,7 @@ def process_interface(interface_info, mapper):
 def write_interface_result_to_sheet(wb, interface_info, results, interface_num):
     """각 인터페이스의 결과를 새로운 시트에 기록합니다."""
     interface_name = interface_info.get('interface_name', '').strip()
+    interface_id = interface_info.get('interface_id', '').strip()
     sheet_name = f'{interface_num}_{interface_name}' if interface_name else f'Interface_{interface_num}'
     
     if sheet_name in wb.sheetnames:
