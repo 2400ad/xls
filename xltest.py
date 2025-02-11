@@ -2,6 +2,7 @@ import openpyxl
 import ast
 from maptest import ColumnMapper
 import os
+from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 
 def read_interface_block(ws, start_col):
     """Excel에서 3컬럼 단위로 하나의 인터페이스 정보를 읽습니다."""
@@ -65,6 +66,19 @@ def process_interface(interface_info, mapper):
     }
     
     try:
+        # 먼저 테이블 정보 설정
+        if interface_info['send']['owner'] and interface_info['send']['table_name']:
+            mapper.set_send_table(interface_info['send']['owner'], interface_info['send']['table_name'])
+        else:
+            results['errors'].append("송신 테이블 정보가 없습니다.")
+            return results
+            
+        if interface_info['recv']['owner'] and interface_info['recv']['table_name']:
+            mapper.set_recv_table(interface_info['recv']['owner'], interface_info['recv']['table_name'])
+        else:
+            results['errors'].append("수신 테이블 정보가 없습니다.")
+            return results
+
         # DB 연결
         if interface_info['send']['db_info']:
             mapper.connect_send_db(
@@ -74,6 +88,7 @@ def process_interface(interface_info, mapper):
             )
         else:
             results['errors'].append("송신 DB 연결 정보가 없습니다.")
+            return results
             
         if interface_info['recv']['db_info']:
             mapper.connect_recv_db(
@@ -83,18 +98,7 @@ def process_interface(interface_info, mapper):
             )
         else:
             results['errors'].append("수신 DB 연결 정보가 없습니다.")
-        
-        # 송신 테이블 설정
-        if interface_info['send']['owner'] and interface_info['send']['table_name']:
-            mapper.set_send_table(interface_info['send']['owner'], interface_info['send']['table_name'])
-        else:
-            results['errors'].append("송신 테이블 정보가 없습니다.")
-        
-        # 수신 테이블 설정
-        if interface_info['recv']['owner'] and interface_info['recv']['table_name']:
-            mapper.set_recv_table(interface_info['recv']['owner'], interface_info['recv']['table_name'])
-        else:
-            results['errors'].append("수신 테이블 정보가 없습니다.")
+            return results
         
         # 매핑 설정
         send_columns = '\n'.join(interface_info['send']['columns'])
@@ -119,73 +123,155 @@ def process_interface(interface_info, mapper):
     
     return results
 
-def write_results_to_excel(wb, interface_results, sheet_name='인터페이스 결과'):
-    """처리 결과를 Excel 시트에 기록합니다."""
+def write_interface_result_to_sheet(wb, interface_info, results, interface_num):
+    """각 인터페이스의 결과를 새로운 시트에 기록합니다."""
+    sheet_name = f'인터페이스_{interface_num}'
     if sheet_name in wb.sheetnames:
         wb.remove(wb[sheet_name])
     ws = wb.create_sheet(sheet_name)
     
-    # 헤더 작성
-    headers = ['구분', '송신테이블', '수신테이블', '컬럼비교결과', '송신SQL', '수신SQL', '필드XML', '오류']
-    ws.append(headers)
+    # 스타일 정의
+    header_fill = PatternFill(start_color='366092', end_color='366092', fill_type='solid')
+    header_font = Font(color='FFFFFF', bold=True)
+    normal_font = Font(name='맑은 고딕')
+    center_alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    border = Border(left=Side(style='thin'), right=Side(style='thin'),
+                   top=Side(style='thin'), bottom=Side(style='thin'))
     
-    # 각 인터페이스 결과 기록
-    for idx, (interface_info, results) in enumerate(interface_results):
-        row = [
-            f'인터페이스 {idx+1}',
-            f"{interface_info['send']['owner']}.{interface_info['send']['table_name']}",
-            f"{interface_info['recv']['owner']}.{interface_info['recv']['table_name']}",
-            str(results['comparison']),
-            results['send_sql'],
-            results['recv_sql'],
-            results['field_xml'],
-            '\n'.join(results['errors'])
-        ]
-        ws.append(row)
+    # 1. 기본 정보 섹션
+    ws.merge_cells('A1:D1')
+    ws['A1'] = '인터페이스 기본 정보'
+    ws['A1'].fill = header_fill
+    ws['A1'].font = header_font
+    ws['A1'].alignment = center_alignment
     
-    # 컬럼 너비 자동 조정
-    for column in ws.columns:
-        max_length = 0
-        column = [cell for cell in column]
-        for cell in column:
-            try:
-                if len(str(cell.value)) > max_length:
-                    max_length = len(str(cell.value))
-            except:
-                pass
-        adjusted_width = (max_length + 2)
-        ws.column_dimensions[column[0].column_letter].width = min(adjusted_width, 100)
+    info_headers = ['송신 테이블', '수신 테이블']
+    for idx, header in enumerate(info_headers, 2):
+        ws[f'A{idx}'] = header
+        ws[f'A{idx}'].font = normal_font
+        ws[f'A{idx}'].alignment = center_alignment
+        
+        value = f"{interface_info['send' if '송신' in header else 'recv']['owner']}.{interface_info['send' if '송신' in header else 'recv']['table_name']}"
+        ws.merge_cells(f'B{idx}:D{idx}')
+        ws[f'B{idx}'] = value
+        ws[f'B{idx}'].alignment = Alignment(horizontal='left', vertical='center')
+    
+    # 2. 컬럼 비교 결과 섹션
+    ws['A4'] = '컬럼 비교 결과'
+    ws['A4'].fill = header_fill
+    ws['A4'].font = header_font
+    ws.merge_cells('A4:D4')
+    ws['A4'].alignment = center_alignment
+    
+    comparison_headers = ['송신 컬럼', '수신 컬럼', '비교 결과', '상태']
+    for idx, header in enumerate(comparison_headers):
+        col = chr(ord('A') + idx)
+        ws[f'{col}5'] = header
+        ws[f'{col}5'].fill = PatternFill(start_color='D9E1F2', end_color='D9E1F2', fill_type='solid')
+        ws[f'{col}5'].font = Font(bold=True)
+        ws[f'{col}5'].alignment = center_alignment
+    
+    row = 6
+    if results['comparison']:
+        for comp in results['comparison']:
+            ws[f'A{row}'] = comp.get('send_column', '')
+            ws[f'B{row}'] = comp.get('recv_column', '')
+            ws[f'C{row}'] = '\n'.join(comp.get('errors', []))
+            ws[f'D{row}'] = '오류' if comp.get('errors') else '정상'
+            
+            # 오류가 있으면 빨간색, 없으면 초록색
+            status_fill = PatternFill(start_color='FF9999' if comp.get('errors') else '99FF99', 
+                                    end_color='FF9999' if comp.get('errors') else '99FF99', 
+                                    fill_type='solid')
+            ws[f'D{row}'].fill = status_fill
+            row += 1
+    
+    # 3. SQL 섹션
+    current_row = row + 1
+    ws[f'A{current_row}'] = 'SQL 문'
+    ws[f'A{current_row}'].fill = header_fill
+    ws[f'A{current_row}'].font = header_font
+    ws.merge_cells(f'A{current_row}:D{current_row}')
+    ws[f'A{current_row}'].alignment = center_alignment
+    
+    # 송신 SQL
+    current_row += 1
+    ws[f'A{current_row}'] = '송신 SQL'
+    ws.merge_cells(f'B{current_row}:D{current_row}')
+    ws[f'B{current_row}'] = results['send_sql']
+    ws[f'B{current_row}'].alignment = Alignment(wrap_text=True)
+    
+    # 수신 SQL
+    current_row += 1
+    ws[f'A{current_row}'] = '수신 SQL'
+    ws.merge_cells(f'B{current_row}:D{current_row}')
+    ws[f'B{current_row}'] = results['recv_sql']
+    ws[f'B{current_row}'].alignment = Alignment(wrap_text=True)
+    
+    # 4. XML 섹션
+    current_row += 2
+    ws[f'A{current_row}'] = '필드 XML'
+    ws[f'A{current_row}'].fill = header_fill
+    ws[f'A{current_row}'].font = header_font
+    ws.merge_cells(f'A{current_row}:D{current_row}')
+    ws[f'A{current_row}'].alignment = center_alignment
+    
+    current_row += 1
+    ws.merge_cells(f'A{current_row}:D{current_row}')
+    ws[f'A{current_row}'] = results['field_xml']
+    ws[f'A{current_row}'].alignment = Alignment(wrap_text=True)
+    
+    # 열 너비 조정
+    ws.column_dimensions['A'].width = 20
+    ws.column_dimensions['B'].width = 20
+    ws.column_dimensions['C'].width = 40
+    ws.column_dimensions['D'].width = 15
+    
+    # 모든 셀에 테두리 적용
+    for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=4):
+        for cell in row:
+            cell.border = border
 
 def main():
     try:
-        # Excel 파일 로드
-        xlsx_path = 'input.xlsx'
-        wb = openpyxl.load_workbook(xlsx_path)
-        ws = wb.active
+        # input.xlsx 파일 로드
+        input_xlsx_path = 'input.xlsx'
+        wb_input = openpyxl.load_workbook(input_xlsx_path)
+        ws_input = wb_input.active
+        
+        # output.xlsx 파일 생성
+        output_xlsx_path = 'output.xlsx'
+        wb_output = openpyxl.Workbook()
+        # 기본 시트 제거
+        wb_output.remove(wb_output.active)
         
         # 각 인터페이스 블록 처리
-        interface_results = []
+        interface_count = 0
         current_col = 2  # B열부터 시작
-        while current_col <= ws.max_column:
-            interface_info = read_interface_block(ws, current_col)
+        while current_col <= ws_input.max_column:
+            interface_info = read_interface_block(ws_input, current_col)
             if not interface_info:
                 break
-                
+            
+            interface_count += 1
             mapper = ColumnMapper()
             results = process_interface(interface_info, mapper)
-            interface_results.append((interface_info, results))
-            current_col += 3  # 다음 인터페이스 블록으로
+            
+            # 결과를 output.xlsx의 새로운 시트에 기록
+            write_interface_result_to_sheet(wb_output, interface_info, results, interface_count)
+            current_col += 3
         
-        # 결과를 Excel에 기록
-        write_results_to_excel(wb, interface_results)
-        wb.save(xlsx_path)
-        print('인터페이스 처리 완료')
+        # 파일 저장
+        wb_output.save(output_xlsx_path)
+        print(f'처리 완료: {interface_count}개의 인터페이스를 처리하여 {output_xlsx_path}에 저장했습니다.')
         
     except Exception as e:
         print(f'오류 발생: {str(e)}')
     finally:
-        if 'wb' in locals():
-            wb.close()
+        if 'wb_input' in locals():
+            wb_input.close()
+        if 'wb_output' in locals():
+            wb_output.close()
 
 if __name__ == "__main__":
     main()
