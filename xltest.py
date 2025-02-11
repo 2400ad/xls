@@ -2,9 +2,6 @@ import openpyxl
 import ast
 from maptest import ColumnMapper
 import os
-import xml_parse1
-import maptest
-import openpyxl
 
 def read_interface_block(ws, start_col):
 	"""Excel에서 3컬럼 단위로 하나의 인터페이스 정보를 읽습니다.
@@ -145,20 +142,23 @@ def analyze_excel():
 		if 'wb' in locals():
 			wb.close()
 
-def load_interface_info(xml_path):
-	# bw.xml 파일을 파싱하여 인터페이스 정보를 반환합니다.
-	# xml_parse1 모듈에 parse_xml 함수가 있다고 가정합니다.
+def get_interface_info(xlsx_path):
+	# input.xlsx 파일의 active sheet에서 1열을 이용하여 인터페이스 정보를 읽어옵니다.
 	try:
-		interface_info = xml_parse1.parse_xml(xml_path)
+		wb = openpyxl.load_workbook(xlsx_path)
 	except Exception as e:
-		print(f'XML 파싱 중 오류 발생: {e}')
-		interface_info = {}
+		print(f'Excel 파일 로드 실패: {e}')
+		return {}
+	
+	ws = wb.active
+	interface_info = read_interface_block(ws, 1)
+	wb.close()
 	return interface_info
 
 def get_mapping_instance(interface_info):
 	# 인터페이스 정보에 따라 매핑 인스턴스를 선택합니다.
-	# 여기서는 예시로 maptest 모듈의 ColumnMapper 클래스를 사용합니다.
-	return maptest.ColumnMapper()
+	# 예시로 maptest 모듈의 ColumnMapper 클래스를 사용합니다.
+	return ColumnMapper()
 
 def process_interface_mapping(mapping_instance, interface_info):
 	# 매핑 인스턴스를 이용하여 각 기능(컬럼 비교, 송신 SQL, 수신 SQL, 필드 생성)을 실행합니다.
@@ -210,12 +210,13 @@ def update_excel_with_results(xlsx_path, results):
 	print('Excel 업데이트 완료')
 
 def main():
-	# bw.xml과 input.xlsx 파일은 현재 작업 디렉토리에 있다고 가정
+	# input.xlsx 파일은 현재 작업 디렉토리에 있다고 가정합니다.
 	current_dir = os.getcwd()
-	xml_path = os.path.join(current_dir, 'bw.xml')
 	xlsx_path = os.path.join(current_dir, 'input.xlsx')
 
-	interface_info = load_interface_info(xml_path)
+	# Excel 파일로부터 인터페이스 정보를 읽어옵니다.
+	interface_info = get_interface_info(xlsx_path)
+
 	mapping_instance = get_mapping_instance(interface_info)
 	results = process_interface_mapping(mapping_instance, interface_info)
 	update_excel_with_results(xlsx_path, results)
