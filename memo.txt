@@ -1,0 +1,35 @@
+BW 의구조
+BW는 
+수신에서 <pd:inputBindings>
+에서 <Record>
+하위에 <EAi-SEQ_ID>
+<xsl:value-of select="EAI_SEQ_ID"/>
+</EAi-SEQ_ID>
+이런식으로 되어 있다.
+만일, 송신의 컬럼명과 수신의 컬럼명이 다를 경우,
+<BOX_ID>
+<xsl:choose>
+<xsl:when test="exists(SEMI_FINISHED_GOODS_BOX_ID)">
+<xsl:value-of select="SEMI_FINISHED_GOOds_BOX_ID"/>
+</xsl:when>
+<xsl:otherwise>
+<xsl:attribute name="xsi:nil">true</xsl:attribute>
+</xsl:otherwise>
+</xsl:choose>
+</BOX_ID>
+이런식으로 변환된다.
+
+
+INSERT INTO 고객 (이름, 나이, 이메일)
+VALUES ('홍길동', 30, 'hong@example.com');
+
+<FRUIT1>
+<xsl:choose>
+<xsl:when test="exists(APPLE)">
+<xsl:value-of select="APPLE"/>
+</xsl:when>
+<xsl:otherwise>
+<xsl:attribute name="xsi:nil">true</xsl:attribute>
+</xsl:otherwise>
+</xsl:choose>
+</FRUIT1>
