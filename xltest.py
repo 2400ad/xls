@@ -132,9 +132,9 @@ def write_interface_result_to_sheet(wb, interface_info, results, interface_num):
     
     # 스타일 정의
     header_fill = PatternFill(start_color='366092', end_color='366092', fill_type='solid')
-    header_font = Font(color='FFFFFF', bold=True, size=12)  # 헤더 폰트 크기 12
-    normal_font = Font(name='맑은 고딕', size=10)  # 일반 텍스트 폰트 크기 10
-    bold_font = Font(bold=True, size=10)  # 굵은 글씨 폰트 크기 10
+    header_font = Font(color='FFFFFF', bold=True, size=11)  # 헤더 폰트 크기 11
+    normal_font = Font(name='맑은 고딕', size=9)  # 일반 텍스트 폰트 크기 9
+    bold_font = Font(bold=True, size=9)  # 굵은 글씨 폰트 크기 9
     center_alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
     left_alignment = Alignment(horizontal='left', vertical='center', wrap_text=True)
     border = Border(left=Side(style='thin'), right=Side(style='thin'),
@@ -164,36 +164,51 @@ def write_interface_result_to_sheet(wb, interface_info, results, interface_num):
     ws['A4'] = '컬럼 비교 결과'
     ws['A4'].fill = header_fill
     ws['A4'].font = header_font
-    ws.merge_cells('A4:D4')
+    ws.merge_cells('A4:H4')  # H열까지 확장
     ws['A4'].alignment = center_alignment
     ws.row_dimensions[4].height = 25
     
-    comparison_headers = ['송신 컬럼', '수신 컬럼', '비교 결과', '상태']
+    comparison_headers = ['송신 컬럼', '송신 타입', '송신 크기', '송신 Null여부', 
+                         '수신 컬럼', '수신 타입', '수신 크기', '수신 Null여부', 
+                         '비교 결과', '상태']
     for idx, header in enumerate(comparison_headers):
         col = chr(ord('A') + idx)
         ws[f'{col}5'] = header
         ws[f'{col}5'].fill = PatternFill(start_color='D9E1F2', end_color='D9E1F2', fill_type='solid')
-        ws[f'{col}5'].font = bold_font  # 굵은 글씨 폰트 적용
+        ws[f'{col}5'].font = bold_font
         ws[f'{col}5'].alignment = center_alignment
     ws.row_dimensions[5].height = 25
     
     row = 6
     if results['comparison']:
         for comp in results['comparison']:
+            # 송신 컬럼 정보
             ws[f'A{row}'] = comp.get('send_column', '')
-            ws[f'B{row}'] = comp.get('recv_column', '')
-            ws[f'C{row}'] = '\n'.join(comp.get('errors', []))
-            ws[f'D{row}'] = '오류' if comp.get('errors') else '정상'
+            ws[f'B{row}'] = comp.get('send_type', '')
+            ws[f'C{row}'] = comp.get('send_size', '')
+            ws[f'D{row}'] = comp.get('send_nullable', '')
+            
+            # 수신 컬럼 정보
+            ws[f'E{row}'] = comp.get('recv_column', '')
+            ws[f'F{row}'] = comp.get('recv_type', '')
+            ws[f'G{row}'] = comp.get('recv_size', '')
+            ws[f'H{row}'] = comp.get('recv_nullable', '')
+            
+            # 비교 결과와 상태
+            ws[f'I{row}'] = '\n'.join(comp.get('errors', []))
+            ws[f'J{row}'] = '오류' if comp.get('errors') else '정상'
             
             # 오류가 있으면 빨간색, 없으면 초록색
             status_fill = PatternFill(start_color='FF9999' if comp.get('errors') else '99FF99', 
                                     end_color='FF9999' if comp.get('errors') else '99FF99', 
                                     fill_type='solid')
-            ws[f'D{row}'].fill = status_fill
+            ws[f'J{row}'].fill = status_fill
             
             # 각 셀의 alignment 설정
-            for col in ['A', 'B', 'C', 'D']:
-                ws[f'{col}{row}'].alignment = left_alignment if col == 'C' else center_alignment
+            for col in range(ord('A'), ord('K')):
+                col_letter = chr(col)
+                ws[f'{col_letter}{row}'].alignment = left_alignment if col_letter == 'I' else center_alignment
+                ws[f'{col_letter}{row}'].font = normal_font
             
             # 행 높이 자동 조절
             max_lines = max(
@@ -201,7 +216,7 @@ def write_interface_result_to_sheet(wb, interface_info, results, interface_num):
                 len(str(comp.get('recv_column', '')).split('\n')),
                 len(comp.get('errors', []))
             )
-            ws.row_dimensions[row].height = max(25, min(15 * max_lines, 100))  # 최소 25, 최대 100
+            ws.row_dimensions[row].height = max(20, min(15 * max_lines, 100))  # 최소 20, 최대 100
             row += 1
     
     # 3. SQL 섹션
@@ -256,13 +271,19 @@ def write_interface_result_to_sheet(wb, interface_info, results, interface_num):
     ws.row_dimensions[current_row].height = max(25, min(15 * lines, 400))  # 최소 25, 최대 400
     
     # 열 너비 조정
-    ws.column_dimensions['A'].width = 20
-    ws.column_dimensions['B'].width = 20
-    ws.column_dimensions['C'].width = 40
-    ws.column_dimensions['D'].width = 15
+    ws.column_dimensions['A'].width = 20  # 송신 컬럼
+    ws.column_dimensions['B'].width = 15  # 송신 타입
+    ws.column_dimensions['C'].width = 12  # 송신 크기
+    ws.column_dimensions['D'].width = 12  # 송신 Null여부
+    ws.column_dimensions['E'].width = 20  # 수신 컬럼
+    ws.column_dimensions['F'].width = 15  # 수신 타입
+    ws.column_dimensions['G'].width = 12  # 수신 크기
+    ws.column_dimensions['H'].width = 12  # 수신 Null여부
+    ws.column_dimensions['I'].width = 40  # 비교 결과
+    ws.column_dimensions['J'].width = 12  # 상태
     
     # 모든 셀에 테두리 적용
-    for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=4):
+    for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=10):
         for cell in row:
             cell.border = border
 
