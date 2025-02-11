@@ -66,19 +66,6 @@ def process_interface(interface_info, mapper):
     }
     
     try:
-        # 먼저 테이블 정보 설정
-        if interface_info['send']['owner'] and interface_info['send']['table_name']:
-            mapper.set_send_table(interface_info['send']['owner'], interface_info['send']['table_name'])
-        else:
-            results['errors'].append("송신 테이블 정보가 없습니다.")
-            return results
-            
-        if interface_info['recv']['owner'] and interface_info['recv']['table_name']:
-            mapper.set_recv_table(interface_info['recv']['owner'], interface_info['recv']['table_name'])
-        else:
-            results['errors'].append("수신 테이블 정보가 없습니다.")
-            return results
-
         # DB 연결
         if interface_info['send']['db_info']:
             mapper.connect_send_db(
@@ -98,6 +85,19 @@ def process_interface(interface_info, mapper):
             )
         else:
             results['errors'].append("수신 DB 연결 정보가 없습니다.")
+            return results
+
+        # 테이블 정보 설정
+        if interface_info['send']['owner'] and interface_info['send']['table_name']:
+            mapper.set_send_table(interface_info['send']['owner'], interface_info['send']['table_name'])
+        else:
+            results['errors'].append("송신 테이블 정보가 없습니다.")
+            return results
+            
+        if interface_info['recv']['owner'] and interface_info['recv']['table_name']:
+            mapper.set_recv_table(interface_info['recv']['owner'], interface_info['recv']['table_name'])
+        else:
+            results['errors'].append("수신 테이블 정보가 없습니다.")
             return results
         
         # 매핑 설정
