@@ -198,12 +198,18 @@ def write_interface_result_to_sheet(wb, interface_info, results, interface_num):
             ws[f'A{row}'] = comp.get('send_column', '')
             ws[f'B{row}'] = send_info.get('type', '')
             ws[f'C{row}'] = send_info.get('size', '')
+            # 글자 타입이고 크기가 1024인 경우 노란색으로 표시
+            if send_info.get('type', '').upper() in ['VARCHAR', 'VARCHAR2', 'CHAR'] and str(send_info.get('size', '')).strip() == '1024':
+                ws[f'C{row}'].fill = PatternFill(start_color='FFFF00', end_color='FFFF00', fill_type='solid')
             ws[f'D{row}'] = send_info.get('nullable', '')
             
             # 수신 컬럼 정보
             ws[f'E{row}'] = comp.get('recv_column', '')
             ws[f'F{row}'] = recv_info.get('type', '')
             ws[f'G{row}'] = recv_info.get('size', '')
+            # 글자 타입이고 크기가 1024인 경우 노란색으로 표시
+            if recv_info.get('type', '').upper() in ['VARCHAR', 'VARCHAR2', 'CHAR'] and str(recv_info.get('size', '')).strip() == '1024':
+                ws[f'G{row}'].fill = PatternFill(start_color='FFFF00', end_color='FFFF00', fill_type='solid')
             ws[f'H{row}'] = recv_info.get('nullable', '')
             
             # 비교 결과와 상태
