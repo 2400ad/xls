@@ -125,7 +125,9 @@ def process_interface(interface_info, mapper):
 
 def write_interface_result_to_sheet(wb, interface_info, results, interface_num):
     """각 인터페이스의 결과를 새로운 시트에 기록합니다."""
-    sheet_name = f'Interface_{interface_num}'
+    interface_name = interface_info.get('interface_name', '').strip()
+    sheet_name = f'{interface_num}_{interface_name}' if interface_name else f'Interface_{interface_num}'
+    
     if sheet_name in wb.sheetnames:
         ws = wb[sheet_name]
     else:
@@ -205,12 +207,12 @@ def write_interface_result_to_sheet(wb, interface_info, results, interface_num):
             
             if errors:
                 ws[f'I{row}'] = '\n'.join(errors)
-                ws[f'J{row}'] = '오류'
-                status_fill = PatternFill(start_color='FF9999', end_color='FF9999', fill_type='solid')
-            elif warnings:
-                ws[f'I{row}'] = ''  # 경고 메시지는 표시하지 않음
                 ws[f'J{row}'] = '확인필요'
-                status_fill = PatternFill(start_color='FFD700', end_color='FFD700', fill_type='solid')  # 노란색
+                status_fill = PatternFill(start_color='FF9999', end_color='FF9999', fill_type='solid')
+            # elif warnings:
+            #     ws[f'I{row}'] = ''  # 경고 메시지는 표시하지 않음
+            #     ws[f'J{row}'] = '확인필요'
+            #     status_fill = PatternFill(start_color='FFD700', end_color='FFD700', fill_type='solid')  # 노란색
             else:
                 ws[f'I{row}'] = ''
                 ws[f'J{row}'] = '정상'
