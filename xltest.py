@@ -7,6 +7,7 @@ from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 def read_interface_block(ws, start_col):
     """Excel에서 3컬럼 단위로 하나의 인터페이스 정보를 읽습니다."""
     interface_info = {
+        'interface_name': ws.cell(row=2, column=start_col).value or '',  # 2행에서 인터페이스 이름 읽기
         'send': {'owner': None, 'table_name': None, 'columns': [], 'db_info': None},
         'recv': {'owner': None, 'table_name': None, 'columns': [], 'db_info': None}
     }
