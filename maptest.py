@@ -284,13 +284,13 @@ class ColumnMapper:
 				recv_col = self.recv_mapping[idx-1] if idx <= len(self.recv_mapping) else ""
 				
 				lines.append(f'    <field key="{idx-1}" nofetch="0" name="{send_col}"></field>')
-				# lines.append(f'    <col{idx}>')
-				# lines.append(f'        <length>{col_info["size"]}</length>')
-				# lines.append(f'        <type>{col_info["type"]}</type>')
-				# lines.append(f'        <name>{send_col}</name>')
-				# if recv_col:
-				# 	lines.append(f'        <mapping>{recv_col}</mapping>')
-				# lines.append(f'    </col{idx}>')
+				lines.append(f'    <col{idx}>')
+				lines.append(f'        <length>{col_info["size"]}</length>')
+				lines.append(f'        <type>{col_info["type"]}</type>')
+				lines.append(f'        <n>{send_col}</n>')
+				if recv_col:
+					lines.append(f'        <mapping>{recv_col}</mapping>')
+				lines.append(f'    </col{idx}>')
 		
 		lines.append('</field>')
 		return '\n'.join(lines)
