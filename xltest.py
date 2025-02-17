@@ -4,6 +4,22 @@ from maptest import ColumnMapper
 import os
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 
+def safe_get_dict_value(dictionary, key, default=''):
+    """
+    딕셔너리에서 안전하게 값을 가져오는 유틸리티 함수
+    
+    Args:
+        dictionary: 검색할 딕셔너리 (None일 수 있음)
+        key: 검색할 키
+        default: 기본값 (dictionary가 None이거나 key가 없을 경우 반환)
+    
+    Returns:
+        찾은 값 또는 기본값
+    """
+    if dictionary is None:
+        return default
+    return dictionary.get(key, default)
+
 def read_interface_block(ws, start_col):
     """Excel에서 3컬럼 단위로 하나의 인터페이스 정보를 읽습니다."""
     interface_info = {
@@ -210,17 +226,17 @@ def write_interface_result_to_sheet(wb, interface_info, results, interface_num):
             
             # 수신 컬럼 정보
             ws[f'E{row}'] = comp.get('recv_column', '')
-            ws[f'F{row}'] = recv_info.get('type', '')
-            ws[f'G{row}'] = recv_info.get('size', '')
+            ws[f'F{row}'] = safe_get_dict_value(recv_info, 'type', '')
+            ws[f'G{row}'] = safe_get_dict_value(recv_info, 'size', '')
             # 글자 타입이고 크기가 1024보다 큰 경우 노란색으로 표시
-            if recv_info.get('type', '').upper() in ['VARCHAR', 'VARCHAR2', 'CHAR']:
+            if safe_get_dict_value(recv_info, 'type', '').upper() in ['VARCHAR', 'VARCHAR2', 'CHAR']:
                 try:
-                    size = int(str(recv_info.get('size', '0')).strip())
+                    size = int(str(safe_get_dict_value(recv_info, 'size', '0')).strip())
                     if size > 1024:
                         ws[f'G{row}'].fill = PatternFill(start_color='FFFF00', end_color='FFFF00', fill_type='solid')
                 except ValueError:
                     pass
-            ws[f'H{row}'] = recv_info.get('nullable', '')
+            ws[f'H{row}'] = safe_get_dict_value(recv_info, 'nullable', '')
             
             # 비교 결과와 상태
             warnings = comp.get('warnings', [])
@@ -240,7 +256,6 @@ def write_interface_result_to_sheet(wb, interface_info, results, interface_num):
                 status_fill = PatternFill(start_color='99FF99', end_color='99FF99', fill_type='solid')
             
             ws[f'J{row}'].fill = status_fill
-            
             # 각 셀의 alignment 설정과 폰트 적용
             for col in range(ord('A'), ord('K')):
                 col_letter = chr(col)
