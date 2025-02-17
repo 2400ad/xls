@@ -370,32 +370,58 @@ def main():
         
         # 각 인터페이스 블록 처리
         interface_count = 0
+        error_interfaces = []  # 오류가 발생한 인터페이스 정보를 저장할 리스트
         current_col = 2  # B열부터 시작
-        while current_col <= ws_input.max_column:
-            interface_info = read_interface_block(ws_input, current_col)
-            if not interface_info:
-                break
-            
-            interface_count += 1
-            mapper = ColumnMapper()
-            results = process_interface(interface_info, mapper)
-            
-            # 결과를 output.xlsx의 새로운 시트에 기록
-            write_interface_result_to_sheet(wb_output, interface_info, results, interface_count)
-            auto_adjust_row_heights(wb_output[wb_output.sheetnames[-1]])
-            current_col += 3
         
-        # 파일 저장
+        while current_col <= ws_input.max_column:
+            try:
+                interface_info = read_interface_block(ws_input, current_col)
+                if not interface_info:
+                    break
+                
+                interface_count += 1
+                interface_name = interface_info.get('interface_name', f'Interface_{interface_count}')
+                
+                print(f"\n처리 중인 인터페이스: {interface_name}")
+                mapper = ColumnMapper()
+                results = process_interface(interface_info, mapper)
+                
+                # 결과를 output.xlsx의 새로운 시트에 기록
+                write_interface_result_to_sheet(wb_output, interface_info, results, interface_count)
+                
+                print(f"인터페이스 {interface_name} 처리 완료")
+                
+            except Exception as e:
+                error_msg = f"인터페이스 처리 중 오류 발생 (열: {current_col}): {str(e)}"
+                print(f"\n[오류] {error_msg}")
+                error_interfaces.append({
+                    'column': current_col,
+                    'interface': interface_info.get('interface_name', f'Interface_{interface_count}') if interface_info else 'Unknown',
+                    'error': str(e)
+                })
+            
+            finally:
+                current_col += 3  # 다음 인터페이스로 이동
+        
+        # 결과 파일 저장
         wb_output.save(output_xlsx_path)
-        print(f'처리 완료: {interface_count}개의 인터페이스를 처리하여 {output_xlsx_path}에 저장했습니다.')
+        wb_input.close()
+        wb_output.close()
+        
+        # 전체 처리 결과 출력
+        print("\n=== 처리 완료 ===")
+        print(f"총 처리된 인터페이스 수: {interface_count}")
+        
+        if error_interfaces:
+            print("\n=== 오류 발생한 인터페이스 목록 ===")
+            for error_info in error_interfaces:
+                print(f"\n인터페이스: {error_info['interface']}")
+                print(f"위치: 열 {error_info['column']}")
+                print(f"오류 내용: {error_info['error']}")
         
     except Exception as e:
-        print(f'오류 발생: {str(e)}')
-    finally:
-        if 'wb_input' in locals():
-            wb_input.close()
-        if 'wb_output' in locals():
-            wb_output.close()
+        print(f"\n[심각한 오류] 프로그램 실행 중 오류 발생: {str(e)}")
+        raise
 
 if __name__ == "__main__":
     main()
