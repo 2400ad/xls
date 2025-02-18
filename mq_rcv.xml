@@ -1,0 +1,137 @@
+<?xml version="1.0"?>
+<adapter poll_time="1000" in="MQSeries" out="Oracle8" vender="MOCOCO" id="1" buffer_size="10M" mode="batch" process_id="GMESEAS_A2" policy="128" intf_ver="1.0">
+<nodes>
+<node name="EAIHUB" host_id="EAI" type="" gubun="B" pos_x="15554" pos_y="10594"/>
+</nodes>
+<links>
+<link from_node_nm="EAIHUB" to_node_nm="GMESEAS_A2" link_type="MQ" path_index="0" path_x="15554" path_y="10594" path_row="2" path_depth="2" hub_node_id="2" hub_host_id="EAI" hub_node_name="EAIHUB" hub_pos_x="15554" hub_pos_y="10594"/>
+</links>
+<info created="20031104191304" version="2.6.0.3" adt_version="A3.3.3" doc_format_version="1.0.0" groupName="GMESPNL" eventName="A2ECOMAPPING_MDB07" nodeName="GMESEAS_A2" localFileName="/var/mqm/adt/TST/PAEDCT2/GMESPNL/GMESPNL.A2ECOMAPPING_MDB07.GMESEAS_A2.RCV.xml" remoteFileName="/var/mqm/adt/TST/PAEDCT2/GMESPNL/GMESPNL.A2ECOMAPPING_MDB07.GMESEAS_A2.RCV.xml" group_id="GMESPNL" intf_id="A2ECOMAPPING_MDB07">
+<ui nodeX="7816" nodeY="21736" host_id="LGDCDT06"/>
+<ftp remotehost="172.19.69.24" remoteuserid="mqm" remotepasswd="lplmqm001"/>
+<mq qmgr="" queue="" connnm="" replyqmgr="" replyq="" rfile=""/>
+</info>
+<in>
+<MQSeries QMgr="CEDT1T" inputq="GMESPNL.A2ECOMAPPING_MDB07.GMESEAS_A2" errorq="GMESPNL.ERRQ" eventq="MTE.EVQ" compress="0"/>
+</in>
+<out>
+<database user="eai_inf" password="eai_xhdtls9" conn="PAEDCT2" format="xml" data_name="data" commit_count="3000" autocommit="0" onepass="0" cursor_expiry="0" cursor_set="0">
+<dbnode db_name="PAEDCT2" record_name="TB_MES_IFO_ECO_MAPPING_I" table_name="TB_EDC_IFI_ECO_TARGET_GLS_N_I" use_cursor="0" deferred_define="0" no_fetch="0">
+<preaction noaction="0" />
+<postaction noaction="0" />
+<SQL noaction="0">
+BEGIN
+INSERT INTO A2EDC_MGR.TB_EDC_IFI_ECO_TARGET_GLS_N_I (   
+     EAI_SEQ_ID, DATA_INTERFACE_TYPE_CODE,
+     EAI_INTERFACE_DATE, APPLICATION_TRANSFER_FLAG, 
+     ECO_ID, VALIDATION_SEQS, 
+     EMEMO_ID, LOT_ID, 
+     GLASS_ID, SLOT_ID, 
+     CASSETTE_ID, FMC_REQUEST_TITLE
+        )
+VALUES (
+     :EAI_SEQ_ID, :DATA_INTERFACE_TYPE_CODE,
+     SYSDATE, 'N',
+     :ECO_ID, :VALIDATION_SEQS, 
+     :EMEMO_ID, :LOT_ID, 
+     :GLASS_ID, :SLOT_ID, 
+     :CASSETTE_ID, :FMC_REQUEST_TITLE
+)     
+        ;
+EXCEPTION
+WHEN OTHERS THEN
+      RAISE_APPLICATION_ERROR(-20002,'
+          TABLE : A2EDC_MGR.TB_EDC_IFI_ECO_TARGET_GLS_N_I'||'
+          EAI_SEQ_ID:'||:EAI_SEQ_ID||'
+          '||sqlerrm);
+END;
+</SQL>
+<update noaction="0"/>
+<fields count="10">
+<field key="0" nofetch="0" name="EAI_SEQ_ID"/>
+<field key="0" nofetch="0" name="DATA_INTERFACE_TYPE_CODE"/>
+<field key="0" nofetch="0" name="ECO_ID"/>
+<field key="0" nofetch="0" name="VALIDATION_SEQS"/>
+<field key="0" nofetch="0" name="EMEMO_ID"/>
+<field key="0" nofetch="0" name="LOT_ID"/>
+<field key="0" nofetch="0" name="GLASS_ID"/>
+<field key="0" nofetch="0" name="SLOT_ID"/>
+<field key="0" nofetch="0" name="CASSETTE_ID"/>
+<field key="0" nofetch="0" name="FMC_REQUEST_TITLE"/>
+</fields>
+</dbnode>
+</database>
+</out>
+<rfh>
+<mcd>
+<Msd>xml</Msd>
+<Set/>
+<Type/>
+<Fmt/>
+</mcd>
+<usr>
+<mte_info>
+<interface_info>
+<host_id>LGDCDT06</host_id>
+<group_id>GMESPNL</group_id>
+<intf_id>A2ECOMAPPING_MDB07</intf_id>
+<seq_no/>
+<date/>
+<time/>
+</interface_info>
+<prev_host_info>
+<host_id/>
+<process_id/>
+</prev_host_info>
+<host_info>
+<host_id/>
+<os_type/>
+<os_version/>
+<process_id/>
+<user_name/>
+</host_info>
+<process_info>
+<date/>
+<time/>
+<hop_cnt>0</hop_cnt>
+<process_mode/>
+<process_type/>
+<process_id/>
+<hub_cnt>1</hub_cnt>
+<recv_spoke_cnt>2</recv_spoke_cnt>
+</process_info>
+<status_info>
+<status/>
+<error_type/>
+<error_code/>
+<error_reason/>
+<error_message/>
+<errorq_msgid/>
+<errorq/>
+</status_info>
+<policy_info>
+<error_policy>128</error_policy>
+</policy_info>
+<sender_info/>
+<receiver_info>
+<host_id>LPLCERPD</host_id>
+<directory></directory>
+<file_name>GMESPNL.A2ECOMAPPING_MDB07.RCV.xml</file_name>
+</receiver_info>
+<data_info>
+<record_cnt/>
+<record_size/>
+<data_size/>
+<data_compress/>
+<compression_method/>
+<compression_mode/>
+<compressed_size/>
+<data_conversion/>
+<conv_method/>
+<conv_mode/>
+<converted_size/>
+</data_info>
+</mte_info>
+</usr>
+</rfh>
+</adapter>

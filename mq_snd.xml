@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adapter poll_time="1000" in="Oracle8" out="MQSeries" vender="MOCOCO" id="3" buffer_size="10M" mode="batch" process_id="SVC_WMS" action_command="" send_nulldata="" intf_ver="1.0">
+<links>
+<link from_node_nm="SVC_WMS" to_node_nm="EAIHUB" link_type="MQ" path_index="0" path_x="12000" path_y="12000" path_row="1" path_depth="2" hub_node_id="1" hub_host_id="EAI" hub_node_name="EAIHUB" hub_pos_x="24000" hub_pos_y="12000"/>
+</links>
+<info created="2009120916242824" version="3.0.0.0" adt_version="A3.3.3" doc_format_version="1.0.1" groupName="SVC" eventName="KITRCPT_MDB02" nodeName="SVC_WMS" localFileName="/var/mqm/adt/PROD/TST31/SVC/SVC.KITRCPT_MDB02.SND.xml" remoteFileName="/var/mqm/adt/PROD/TST31/SVC/SVC.KITRCPT_MDB02.SND.xml" description="" pwd_enc="" encoding="">
+<ui nodeX="12000" nodeY="12000" host_id="LGDDERD2"/>
+<ftp remotehost="172.19.69.24" remoteuserid="mqm" remotepasswd="lplmqm001"/>
+<mq qmgr="" queue="" connnm="" replyqmgr="" replyq="" rfile=""/>
+</info>
+<in>
+<database conn="TST31" user="eai_inf" password="tst3eai_inf" format="xml" data_name="data" commit_count="3000" autocommit="0" onepass="0" cursor_expiry="0" cursor_set="0">
+<dbnode db_name="TST31" record_name="XXWMSV_KIT_RCPT_S_I" table_name="XXWMSV_KIT_RCPT_S_I" noaction="0" use_cursor="0" deferred_define="0" no_fetch="0" apply_all_null="0">
+<preaction noaction="0">UPDATE XXWMSV.XXWMSV_KIT_RCPT_S_I
+    SET EAI_TRANSFER_FLAG = 'P'
+    WHERE EAI_TRANSFER_FLAG = 'N'</preaction>
+<postaction noaction="0">UPDATE XXWMSV.XXWMSV_KIT_RCPT_S_I
+    SET EAI_TRANSFER_FLAG = 'Y', EAI_TRANSFER_DATE=SYSDATE
+   WHERE EAI_TRANSFER_FLAG = 'P'</postaction>
+<SQL noaction="0">SELECT
+     EAI_SEQ_ID, DATA_INTERFACE_TYPE_CODE,
+     FACTORY_CODE, PALLET_NO, 
+     PRODUCTION_TYPE_CODE, MODEL_CODE, 
+     GRADE_CODE, REMARK_CONTENT, 
+     CUSTOMER_CODE, CUSTOMER_LABEL_ID, 
+     TO_CHAR(WH_RECEIVING_DATE, 'YYYYMMDDHH24MISS')        
+    FROM XXWMSV.XXWMSV_KIT_RCPT_S_I
+    WHERE EAI_TRANSFER_FLAG = 'P'</SQL>
+<update noaction="0"/>
+<fields count="11">
+<field key="0" nofetch="0" name="EAI_SEQ_ID" length_info="0" start_info="0"/>
+<field key="0" nofetch="0" name="DATA_INTERFACE_TYPE_CODE" length_info="0" start_info="0"/>
+<field key="0" nofetch="0" name="FACTORY_CODE" length_info="0" start_info="0"/>
+<field key="0" nofetch="0" name="PALLET_NO" length_info="0" start_info="0"/>
+<field key="0" nofetch="0" name="PRODUCTION_TYPE_CODE" length_info="0" start_info="0"/>
+<field key="0" nofetch="0" name="MODEL_CODE" length_info="0" start_info="0"/>
+<field key="0" nofetch="0" name="GRADE_CODE" length_info="0" start_info="0"/>
+<field key="0" nofetch="0" name="REMARK_CONTENT" length_info="0" start_info="0"/>
+<field key="0" nofetch="0" name="CUSTOMER_CODE" length_info="0" start_info="0"/>
+<field key="0" nofetch="0" name="CUSTOMER_LABEL_ID" length_info="0" start_info="0"/>
+<field key="0" nofetch="0" name="WH_RECEIVING_DATE" length_info="0" start_info="0"/>
+</fields>
+</dbnode>
+</database>
+</in>
+<out>
+<MQSeries QMgr="ERP1T" outputq="SVC.KITRCPT11_MDB02" errorq="SVC.ERRQ" eventq="MTE.EVQ" compress="0"/>
+</out>
+<rfh>
+<mcd>
+<Msd>xml</Msd>
+<Set/>
+<Type/>
+<Fmt/>
+</mcd>
+<usr>
+<mte_info>
+<interface_info>
+<host_id>LGDDERP1</host_id>
+<group_id>SVC</group_id>
+<intf_id>KITRCPT_MDB02</intf_id>
+<biz_info/>
+<seq_no/>
+<date/>
+<time/>
+</interface_info>
+<prev_host_info>
+<host_id/>
+<process_id/>
+</prev_host_info>
+<host_info>
+<host_id/>
+<os_type/>
+<os_version/>
+<process_id/>
+<user_name/>
+</host_info>
+<process_info>
+<date/>
+<time/>
+<hop_cnt>0</hop_cnt>
+<process_mode/>
+<process_type/>
+<process_id/>
+<use_traceq/>
+<use_eventq/>
+<hub_cnt>1</hub_cnt>
+<recv_spoke_cnt>2</recv_spoke_cnt>
+</process_info>
+<status_info>
+<status/>
+<error_type/>
+<error_code/>
+<error_reason/>
+<error_message/>
+<errorq_msgid/>
+<errorq/>
+</status_info>
+<policy_info>
+<error_policy>128</error_policy>
+</policy_info>
+<sender_info/>
+<receiver_info>
+<host_id>LGDDERP1</host_id>
+<directory/>
+<file_name>SVC.KITRCPT_MDB02.SND.xml</file_name>
+</receiver_info>
+<data_info>
+<record_cnt/>
+<record_size/>
+<data_size/>
+<data_compress/>
+<compression_method/>
+<compression_mode/>
+<compressed_size/>
+<data_conversion/>
+<conv_method/>
+<conv_mode/>
+<converted_size/>
+</data_info>
+<data_key_info/>
+</mte_info>
+</usr>
+</rfh>
+</adapter>
