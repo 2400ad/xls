@@ -160,20 +160,21 @@ class XMLComparator:
     def process_all_interfaces(self) -> List[Dict]:
         """
         Excel 파일의 모든 인터페이스를 처리합니다.
+        B열부터 시작하여 3컬럼 단위로 처리합니다.
         
         Returns:
             List[Dict]: 각 인터페이스의 처리 결과 목록
         """
         results = []
-        col = 1
+        current_col = 2  # B열부터 시작
         
-        while True:
-            result = self.process_interface_block(col)
+        while current_col <= self.worksheet.max_column:
+            result = self.process_interface_block(current_col)
             if not result:
                 break
                 
             results.append(result)
-            col += 3  # 다음 인터페이스 블록으로 이동
+            current_col += 3  # 다음 인터페이스 블록으로 이동 (3컬럼 단위)
             
         return results
         
