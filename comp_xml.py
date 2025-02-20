@@ -1,10 +1,11 @@
 import openpyxl
 from xltest import read_interface_block, process_interface
-from comp_q import QueryParser, QueryDifference, FileSearcher
+from comp_q import QueryParser, QueryDifference
 from maptest import ColumnMapper
 import xml.etree.ElementTree as ET
 from typing import Dict, List, Optional, Tuple
 import os
+import fnmatch
 
 class XMLComparator:
     def __init__(self, excel_path: str, search_dir: str):
@@ -21,7 +22,6 @@ class XMLComparator:
         self.worksheet = self.workbook.active
         self.mapper = ColumnMapper()
         self.query_parser = QueryParser()
-        self.file_searcher = FileSearcher()
         
     def extract_from_xml(self, xml_path: str) -> Tuple[str, str]:
         """
@@ -75,6 +75,7 @@ class XMLComparator:
     def find_interface_files(self, if_id: str) -> Dict[str, str]:
         """
         주어진 IF ID에 해당하는 송수신 XML 파일을 찾습니다.
+        파일명 패턴: {if_id}로 시작하고 .SND.xml 또는 .RCV.xml로 끝나는 파일
         
         Args:
             if_id (str): 인터페이스 ID
@@ -82,17 +83,26 @@ class XMLComparator:
         Returns:
             Dict[str, str]: {'send': 송신파일경로, 'recv': 수신파일경로}
         """
-        results = self.file_searcher.find_files_with_keywords(
-            self.search_dir, 
-            [f"{if_id}*.SND.xml", f"{if_id}*.RCV.xml"]
-        )
-        
         files = {'send': None, 'recv': None}
-        for file_path in results.get(if_id, []):
-            if file_path.endswith('.SND.xml'):
-                files['send'] = file_path
-            elif file_path.endswith('.RCV.xml'):
-                files['recv'] = file_path
+        
+        # 파일명 패턴 생성
+        snd_pattern = f"{if_id}*.SND.xml"
+        rcv_pattern = f"{if_id}*.RCV.xml"
+        
+        # 디렉토리 검색
+        for root, _, filenames in os.walk(self.search_dir):
+            for filename in filenames:
+                if fnmatch.fnmatch(filename, snd_pattern):
+                    files['send'] = os.path.join(root, filename)
+                elif fnmatch.fnmatch(filename, rcv_pattern):
+                    files['recv'] = os.path.join(root, filename)
+                    
+                # 두 파일을 모두 찾았으면 검색 종료
+                if files['send'] and files['recv']:
+                    break
+            if files['send'] and files['recv']:
+                break
+                
         return files
         
     def process_interface_block(self, start_col: int) -> Optional[Dict]:
