@@ -84,7 +84,7 @@ class XMLComparator:
         """
         results = self.file_searcher.find_files_with_keywords(
             self.search_dir, 
-            [f"{if_id}.*SND.xml", f"{if_id}.*RCV.xml"]
+            [f"{if_id}*.SND.xml", f"{if_id}*.RCV.xml"]
         )
         
         files = {'send': None, 'recv': None}
