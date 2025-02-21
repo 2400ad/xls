@@ -129,18 +129,25 @@ class QueryParser:
             table2 = self.extract_table_name(query2)
         elif re.match(r'(?i)insert', norm_query1):
             result.query_type = 'INSERT'
-            _, columns1 = self.parse_insert_parts(query1)
-            _, columns2 = self.parse_insert_parts(query2)
-            table1 = self.extract_table_name(query1)
-            table2 = self.extract_table_name(query2)
+            insert_result1 = self.parse_insert_parts(query1)
+            insert_result2 = self.parse_insert_parts(query2)
+            
+            if insert_result1 is None or insert_result2 is None:
+                raise ValueError("INSERT 쿼리 파싱 실패")
+                
+            table1, columns1 = insert_result1
+            table2, columns2 = insert_result2
         else:
             raise ValueError("지원하지 않는 쿼리 타입입니다.")
+            
+        if columns1 is None or columns2 is None:
+            raise ValueError("쿼리 파싱 실패")
             
         result.table_name = table1
         
         # 특수 컬럼 제외
         direction = 'recv' if result.query_type == 'INSERT' else 'send'
-        special_cols = set(QueryParser.special_columns[direction]['required'])
+        special_cols = set(self.special_columns[direction]['required'])
         
         # 일반 컬럼만 비교 (대소문자 구분 없이 비교하되 원본 케이스 유지)
         columns1_filtered = {k: v for k, v in columns1.items() if k.upper() not in special_cols}
