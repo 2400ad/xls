@@ -69,39 +69,55 @@ class QueryParser:
 
     def parse_select_columns(self, query) -> Optional[Dict[str, str]]:
         """Extract columns from SELECT query and return as dictionary"""
-        # 대소문자 구분 없이 SELECT와 FROM 사이의 부분을 찾되, 원본 대소문자는 유지
-        match = re.match(r'(?i)select\s+(.+?)\s+from', query)
+        # 정규화된 쿼리 사용
+        query = self.normalize_query(query)
+        
+        # SELECT와 FROM 사이의 컬럼 추출 (대소문자 구분 없이)
+        match = re.search(r'(?i)SELECT\s+(.*?)\s+FROM', query)
         if not match:
             return None
-        
+            
         columns = {}
         for col in match.group(1).split(','):
             col = col.strip()
-            # 컬럼명의 원래 대소문자를 유지
-            columns[col] = col
-        return columns
+            if col:  # 빈 문자열이 아닌 경우만 처리
+                columns[col] = col
+        return columns if columns else None
 
     def parse_insert_parts(self, query) -> Optional[Tuple[str, Dict[str, str]]]:
         """Extract and return table name and column-value pairs from INSERT query"""
-        # Extract table name (case-insensitive match but preserve original case)
-        table_match = re.search(r'(?i)insert\s+into\s+(\w+\.?\w+)\s*\(', query)
+        # 정규화된 쿼리 사용
+        query = self.normalize_query(query)
+        
+        # INSERT INTO와 테이블 이름 추출 (대소문자 구분 없이)
+        table_match = re.search(r'(?i)INSERT\s+INTO\s+([A-Za-z0-9_$.]+)', query)
         if not table_match:
             return None
         table_name = table_match.group(1)
         
-        # Extract columns and values (preserve case)
-        cols_match = re.search(r'\((.*?)\)\s*(?i)values\s*\((.*?)\)', query)
+        # 컬럼과 값 추출
+        pattern = r'\((.*?)\)\s*(?i)VALUES\s*\((.*?)\)'
+        cols_match = re.search(pattern, query, re.DOTALL)
         if not cols_match:
             return None
             
+        # 컬럼과 값 파싱
         columns = {}
         col_names = [c.strip() for c in cols_match.group(1).split(',')]
         col_values = [v.strip() for v in cols_match.group(2).split(',')]
         
+        # 컬럼과 값의 개수가 일치하는지 확인
+        if len(col_names) != len(col_values):
+            return None
+            
+        # 빈 컬럼이나 값이 있는지 확인
+        if not all(col_names) or not all(col_values):
+            return None
+            
         for name, value in zip(col_names, col_values):
             columns[name] = value
             
-        return table_name, columns
+        return (table_name, columns) if columns else None
 
     def compare_queries(self, query1: str, query2: str) -> QueryDifference:
         """
@@ -121,13 +137,17 @@ class QueryParser:
         norm_query2 = self.normalize_query(query2)
         
         # 쿼리 타입 확인 (대소문자 구분 없이)
-        if re.match(r'(?i)select', norm_query1):
+        if re.match(r'(?i)SELECT', norm_query1):
             result.query_type = 'SELECT'
             columns1 = self.parse_select_columns(query1)
             columns2 = self.parse_select_columns(query2)
             table1 = self.extract_table_name(query1)
             table2 = self.extract_table_name(query2)
-        elif re.match(r'(?i)insert', norm_query1):
+            
+            if columns1 is None or columns2 is None:
+                raise ValueError("SELECT 쿼리 파싱 실패")
+                
+        elif re.match(r'(?i)INSERT', norm_query1):
             result.query_type = 'INSERT'
             insert_result1 = self.parse_insert_parts(query1)
             insert_result2 = self.parse_insert_parts(query2)
@@ -139,9 +159,6 @@ class QueryParser:
             table2, columns2 = insert_result2
         else:
             raise ValueError("지원하지 않는 쿼리 타입입니다.")
-            
-        if columns1 is None or columns2 is None:
-            raise ValueError("쿼리 파싱 실패")
             
         result.table_name = table1
         
