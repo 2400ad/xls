@@ -203,7 +203,7 @@ class QueryParser:
         if not columns:
             return warnings
             
-        # 대소문자 구분 없이 컬럼 비교를 위한 매핑 생성
+        # 대소문자 구분 없이 컬럼 비교를 위한 매핑 make
         columns_upper = {k.upper(): (k, v) for k, v in columns.items()}
         
         # 필수 특수 컬럼 체크
