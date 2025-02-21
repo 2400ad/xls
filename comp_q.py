@@ -88,17 +88,22 @@ class QueryParser:
         """Extract and return table name and column-value pairs from INSERT query"""
         # 정규화된 쿼리 사용
         query = self.normalize_query(query)
+        print(f"\nProcessing INSERT query:\n{query}")
         
         # INSERT INTO와 테이블 이름 추출
         table_match = re.search(r'INSERT\s+INTO\s+([A-Za-z0-9_$.]+)', query, flags=re.IGNORECASE)
         if not table_match:
+            print("Failed to match INSERT INTO pattern")
             return None
+            
         table_name = table_match.group(1)
+        print(f"Found table name: {table_name}")
         
         # 컬럼과 값 추출
         pattern = r'\((.*?)\)\s*VALUES\s*\((.*?)\)'
         cols_match = re.search(pattern, query, flags=re.IGNORECASE | re.DOTALL)
         if not cols_match:
+            print("Failed to match columns and values pattern")
             return None
             
         # 컬럼과 값 파싱
@@ -106,17 +111,23 @@ class QueryParser:
         col_names = [c.strip() for c in cols_match.group(1).split(',')]
         col_values = [v.strip() for v in cols_match.group(2).split(',')]
         
+        print(f"Found columns: {col_names}")
+        print(f"Found values: {col_values}")
+        
         # 컬럼과 값의 개수가 일치하는지 확인
         if len(col_names) != len(col_values):
+            print(f"Column count ({len(col_names)}) does not match value count ({len(col_values)})")
             return None
             
         # 빈 컬럼이나 값이 있는지 확인
         if not all(col_names) or not all(col_values):
+            print("Found empty column names or values")
             return None
             
         for name, value in zip(col_names, col_values):
             columns[name] = value
             
+        print(f"Successfully parsed {len(columns)} columns")
         return (table_name, columns) if columns else None
 
     def compare_queries(self, query1: str, query2: str) -> QueryDifference:

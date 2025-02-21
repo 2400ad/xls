@@ -33,28 +33,41 @@ class XMLComparator:
         Returns:
             Tuple[str, str]: (쿼리, XML 내용)
         """
-        if not xml_path or not os.path.exists(xml_path):
-            return None, None
-            
         try:
-            # XML 파일 전체 내용 읽기
-            with open(xml_path, 'r', encoding='utf-8') as f:
-                xml_content = f.read()
+            # XML 파일이 제대로 로드되었는지 확인
+            if not os.path.exists(xml_path):
+                print(f"Warning: XML file not found: {xml_path}")
+                return None, None
+                
+            tree = ET.parse(xml_path)
+            root = tree.getroot()
             
-            # QueryParser를 사용하여 쿼리 추출
-            select_queries, insert_queries = self.query_parser.parse_xml_file(xml_path)
+            # XML 내용이 유효한지 확인
+            if root is None:
+                print(f"Warning: Invalid XML content in file: {xml_path}")
+                return None, None
             
-            # 파일이 .SND.xml로 끝나면 SELECT 쿼리를, .RCV.xml로 끝나면 INSERT 쿼리를 사용
-            query = None
-            if xml_path.endswith('.SND.xml') and select_queries:
-                query = select_queries[0]  # 첫 번째 SELECT 쿼리 사용
-            elif xml_path.endswith('.RCV.xml') and insert_queries:
-                query = insert_queries[0]  # 첫 번째 INSERT 쿼리 사용
+            # SQL 노드 찾기
+            sql_node = root.find(".//SQL")
+            if sql_node is None or not sql_node.text:
+                print(f"Warning: No SQL content found in file: {xml_path}")
+                return None, None
+                
+            query = sql_node.text.strip()
+            xml_content = ET.tostring(root, encoding='unicode')
             
+            # 추출된 쿼리가 유효한지 확인
+            if not query:
+                print(f"Warning: Empty SQL query in file: {xml_path}")
+                return None, None
+                
             return query, xml_content
             
+        except ET.ParseError as e:
+            print(f"Error parsing XML file {xml_path}: {e}")
+            return None, None
         except Exception as e:
-            print(f"XML 파일 처리 중 오류 발생: {str(e)}")
+            print(f"Unexpected error processing file {xml_path}: {e}")
             return None, None
             
     def compare_queries(self, query1: str, query2: str) -> QueryDifference:
@@ -115,77 +128,76 @@ class XMLComparator:
         Returns:
             Optional[Dict]: 처리된 인터페이스 정보와 결과, 실패시 None
         """
-        # xltest.py의 함수를 사용하여 Excel에서 정보 읽기
-        interface_info = read_interface_block(self.worksheet, start_col)
-        if not interface_info:
-            return None
-            
-        # Excel에서 추출된 쿼리와 XML 얻기
-        excel_results = process_interface(interface_info, self.mapper)
-        
-        # IF ID를 사용하여 관련 파일 찾기
-        if_id = interface_info['interface_id']
-        interface_files = self.find_interface_files(if_id)
-        
-        # XML 파일에서 쿼리와 XML 추출
-        file_results = {
-            'send': {'query': None, 'xml': None},
-            'recv': {'query': None, 'xml': None}
-        }
-        
-        if interface_files['send']:
-            file_results['send']['query'], file_results['send']['xml'] = \
-                self.extract_from_xml(interface_files['send'])
+        try:
+            # Excel에서 인터페이스 정보 읽기
+            excel_results = read_interface_block(self.worksheet, start_col)
+            if not excel_results:
+                print(f"Warning: Failed to read interface block at column {start_col}")
+                return None
                 
-        if interface_files['recv']:
-            file_results['recv']['query'], file_results['recv']['xml'] = \
-                self.extract_from_xml(interface_files['recv'])
-        
-        # 쿼리 비교 및 특수 컬럼 체크
-        comparisons = {
-            'send': None,
-            'recv': None
-        }
-        
-        warnings = {
-            'send': [],
-            'recv': []
-        }
-        
-        # 송신 쿼리 처리
-        if excel_results['send_sql'] and file_results['send']['query']:
-            comparisons['send'] = self.query_parser.compare_queries(
-                excel_results['send_sql'],
-                file_results['send']['query']
-            )
-            warnings['send'].extend(
-                self.query_parser.check_special_columns(
-                    file_results['send']['query'],
-                    'send'
-                )
-            )
+            # 송수신 파일 찾기
+            file_results = self.find_interface_files(excel_results['if_id'])
+            if not file_results:
+                print(f"Warning: No interface files found for IF_ID: {excel_results['if_id']}")
+                return None
+                
+            # 결과 초기화
+            comparisons = {
+                'send': None,
+                'recv': None
+            }
+            warnings = {
+                'send': [],
+                'recv': []
+            }
             
-        # 수신 쿼리 처리
-        if excel_results['recv_sql'] and file_results['recv']['query']:
-            comparisons['recv'] = self.query_parser.compare_queries(
-                excel_results['recv_sql'],
-                file_results['recv']['query']
-            )
-            warnings['recv'].extend(
-                self.query_parser.check_special_columns(
-                    file_results['recv']['query'],
-                    'recv'
-                )
-            )
-        
-        return {
-            'interface_info': interface_info,
-            'excel_results': excel_results,
-            'file_results': file_results,
-            'files': interface_files,
-            'comparisons': comparisons,
-            'warnings': warnings
-        }
+            # 송신 쿼리 처리
+            if excel_results['send_sql'] and file_results['send']['query']:
+                try:
+                    comparisons['send'] = self.query_parser.compare_queries(
+                        excel_results['send_sql'],
+                        file_results['send']['query']
+                    )
+                    warnings['send'].extend(
+                        self.query_parser.check_special_columns(
+                            file_results['send']['query'],
+                            'send'
+                        )
+                    )
+                except Exception as e:
+                    print(f"Error comparing send queries: {e}")
+                    print(f"Excel query: {excel_results['send_sql']}")
+                    print(f"File query: {file_results['send']['query']}")
+            
+            # 수신 쿼리 처리
+            if excel_results['recv_sql'] and file_results['recv']['query']:
+                try:
+                    comparisons['recv'] = self.query_parser.compare_queries(
+                        excel_results['recv_sql'],
+                        file_results['recv']['query']
+                    )
+                    warnings['recv'].extend(
+                        self.query_parser.check_special_columns(
+                            file_results['recv']['query'],
+                            'recv'
+                        )
+                    )
+                except Exception as e:
+                    print(f"Error comparing receive queries: {e}")
+                    print(f"Excel query: {excel_results['recv_sql']}")
+                    print(f"File query: {file_results['recv']['query']}")
+            
+            return {
+                'if_id': excel_results['if_id'],
+                'comparisons': comparisons,
+                'warnings': warnings,
+                'excel': excel_results,
+                'files': file_results
+            }
+            
+        except Exception as e:
+            print(f"Error processing interface block at column {start_col}: {e}")
+            return None
         
     def process_all_interfaces(self) -> List[Dict]:
         """
@@ -227,16 +239,15 @@ def main():
         
         # 결과 출력
         for idx, result in enumerate(results, 1):
-            interface_info = result['interface_info']
-            excel_results = result['excel_results']
-            file_results = result['file_results']
-            files = result['files']
+            if_id = result['if_id']
             comparisons = result['comparisons']
             warnings = result['warnings']
+            excel_results = result['excel']
+            files = result['files']
             
             print(f"\n=== 인터페이스 {idx} ===")
-            print(f"ID: {interface_info['interface_id']}")
-            print(f"이름: {interface_info['interface_name']}")
+            print(f"ID: {if_id}")
+            print(f"이름: {excel_results['interface_name']}")
             
             print("\n파일 검색 결과:")
             print(f"송신 파일: {files['send']}")
