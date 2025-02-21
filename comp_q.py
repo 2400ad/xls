@@ -124,17 +124,17 @@ class QueryParser:
         norm_query1 = QueryParser.normalize_query(query1)
         norm_query2 = QueryParser.normalize_query(query2)
         
-        # 쿼리 타입 확인
-        if norm_query1.startswith('select'):
+        # 쿼리 타입 확인 (대소문자 구분 없이)
+        if re.match(r'(?i)select', norm_query1):
             result.query_type = 'SELECT'
             columns1 = QueryParser.parse_select_columns(query1)
             columns2 = QueryParser.parse_select_columns(query2)
             table1 = QueryParser.extract_table_name(query1)
             table2 = QueryParser.extract_table_name(query2)
-        elif norm_query1.startswith('insert'):
+        elif re.match(r'(?i)insert', norm_query1):
             result.query_type = 'INSERT'
-            columns1 = QueryParser.parse_insert_parts(query1)[1]
-            columns2 = QueryParser.parse_insert_parts(query2)[1]
+            _, columns1 = QueryParser.parse_insert_parts(query1)
+            _, columns2 = QueryParser.parse_insert_parts(query2)
             table1 = QueryParser.extract_table_name(query1)
             table2 = QueryParser.extract_table_name(query2)
         else:
@@ -146,19 +146,19 @@ class QueryParser:
         direction = 'recv' if result.query_type == 'INSERT' else 'send'
         special_cols = set(QueryParser.special_columns[direction]['required'])
         
-        # 일반 컬럼만 비교
-        columns1 = {k: v for k, v in columns1.items() if k.upper() not in special_cols}
-        columns2 = {k: v for k, v in columns2.items() if k.upper() not in special_cols}
+        # 일반 컬럼만 비교 (대소문자 구분 없이 비교하되 원본 케이스 유지)
+        columns1_filtered = {k: v for k, v in columns1.items() if k.upper() not in special_cols}
+        columns2_filtered = {k: v for k, v in columns2.items() if k.upper() not in special_cols}
         
         # 컬럼 비교
-        all_columns = set(columns1.keys()) | set(columns2.keys())
+        all_columns = set(columns1_filtered.keys()) | set(columns2_filtered.keys())
         for col in all_columns:
-            if col not in columns1:
-                result.add_difference(col, None, columns2[col])
-            elif col not in columns2:
-                result.add_difference(col, columns1[col], None)
-            elif columns1[col] != columns2[col]:
-                result.add_difference(col, columns1[col], columns2[col])
+            if col not in columns1_filtered:
+                result.add_difference(col, None, columns2_filtered[col])
+            elif col not in columns2_filtered:
+                result.add_difference(col, columns1_filtered[col], None)
+            elif columns1_filtered[col] != columns2_filtered[col]:
+                result.add_difference(col, columns1_filtered[col], columns2_filtered[col])
                 
         return result
 
