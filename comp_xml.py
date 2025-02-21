@@ -273,16 +273,24 @@ class XMLComparator:
             print("\n쿼리 비교 결과:")
             if result['comparisons']['send']:
                 print("송신 쿼리:")
-                print(result['comparisons']['send'])
+                print(f"  {result['comparisons']['send']}")
             if result['comparisons']['recv']:
                 print("수신 쿼리:")
-                print(result['comparisons']['recv'])
+                print(f"  {result['comparisons']['recv']}")
             
-            print("\n경고:")
-            if result['warnings']['send']:
-                print("송신:", result['warnings']['send'])
-            if result['warnings']['recv']:
-                print("수신:", result['warnings']['recv'])
+            # 경고가 있을 때만 경고 섹션 출력
+            send_warnings = result['warnings']['send']
+            recv_warnings = result['warnings']['recv']
+            if send_warnings or recv_warnings:
+                print("\n경고:")
+                if send_warnings:
+                    print("송신 쿼리 경고:")
+                    for warning in send_warnings:
+                        print(f"  - {warning}")
+                if recv_warnings:
+                    print("수신 쿼리 경고:")
+                    for warning in recv_warnings:
+                        print(f"  - {warning}")
                 
         return results
         
