@@ -53,9 +53,6 @@ class QueryParser:
         Returns:
             str: Normalized query
         """
-        # Convert to lowercase for case-insensitive comparison
-        query = query.lower()
-        
         # Remove comments if any
         query = re.sub(r'--.*$', '', query, flags=re.MULTILINE)
         
@@ -65,49 +62,49 @@ class QueryParser:
         # Remove whitespace around common SQL punctuation
         query = re.sub(r'\s*(,|\(|\))\s*', r'\1', query)
         
-        # Ensure single space after SQL keywords
-        query = re.sub(r'(select|from|where|into|values)\s+', r'\1 ', query)
+        # Ensure single space after SQL keywords (case-insensitive match but preserve original case)
+        for keyword in ['SELECT', 'FROM', 'WHERE', 'INTO', 'VALUES']:
+            query = re.sub(f'(?i){keyword}\\s+', f'{keyword} ', query)
         
         return query.strip()
 
     @staticmethod
     def parse_select_columns(query) -> Optional[Dict[str, str]]:
         """Extract columns from SELECT query and return as dictionary"""
-        query = QueryParser.normalize_query(query)
-        match = re.match(r'select\s+(.+?)\s+from', query)
+        # 대소문자 구분 없이 SELECT와 FROM 사이의 부분을 찾되, 원본 대소문자는 유지
+        match = re.match(r'(?i)select\s+(.+?)\s+from', query)
         if not match:
             return None
         
         columns = {}
         for col in match.group(1).split(','):
             col = col.strip()
-            # Use the full column expression as both key and value
+            # 컬럼명의 원래 대소문자를 유지
             columns[col] = col
         return columns
 
     @staticmethod
     def parse_insert_parts(query) -> Optional[Tuple[str, Dict[str, str]]]:
         """Extract and return table name and column-value pairs from INSERT query"""
-        query = QueryParser.normalize_query(query)
-        
-        # Extract table name
-        table_match = re.search(r'insert\s+into\s+(\w+\.?\w+)\s*\(', query)
+        # Extract table name (case-insensitive match but preserve original case)
+        table_match = re.search(r'(?i)insert\s+into\s+(\w+\.?\w+)\s*\(', query)
         if not table_match:
             return None
         table_name = table_match.group(1)
         
-        # Extract columns and values
-        cols_match = re.search(r'\((.*?)\)\s*values\s*\((.*?)\)', query)
+        # Extract columns and values (preserve case)
+        cols_match = re.search(r'\((.*?)\)\s*(?i)values\s*\((.*?)\)', query)
         if not cols_match:
             return None
             
-        columns = [col.strip() for col in cols_match.group(1).split(',')]
-        values = [val.strip() for val in cols_match.group(2).split(',')]
+        columns = {}
+        col_names = [c.strip() for c in cols_match.group(1).split(',')]
+        col_values = [v.strip() for v in cols_match.group(2).split(',')]
         
-        # Create column-value dictionary
-        col_val_dict = dict(zip(columns, values))
-        
-        return table_name, col_val_dict
+        for name, value in zip(col_names, col_values):
+            columns[name] = value
+            
+        return table_name, columns
 
     @staticmethod
     def compare_queries(query1: str, query2: str) -> QueryDifference:
@@ -177,26 +174,30 @@ class QueryParser:
             List[str]: 경고 메시지 리스트
         """
         warnings = []
-        norm_query = self.normalize_query(query)
         
         if direction == 'send':
             columns = self.parse_select_columns(query)
         else:
-            columns = self.parse_insert_parts(query)[1]
-        
-        # 대문자로 변환하여 비교
-        columns = {k.upper(): v for k, v in columns.items()}
+            _, columns = self.parse_insert_parts(query)
+            
+        if not columns:
+            return warnings
+            
+        # 대소문자 구분 없이 컬럼 비교를 위한 매핑 생성
+        columns_upper = {k.upper(): (k, v) for k, v in columns.items()}
         
         # 필수 특수 컬럼 체크
-        for col in QueryParser.special_columns[direction]['required']:
-            if col not in columns:
+        for col in self.special_columns[direction]['required']:
+            if col not in columns_upper:
                 warnings.append(f"필수 특수 컬럼 '{col}'이(가) {direction} 쿼리에 없습니다.")
         
         # 수신 쿼리의 특수 값 체크
         if direction == 'recv':
-            for col, expected_value in QueryParser.special_columns[direction]['special_values'].items():
-                if col in columns and columns[col].upper() != expected_value.upper():
-                    warnings.append(f"특수 컬럼 '{col}'의 값이 '{expected_value}'이(가) 아닙니다. (현재 값: {columns[col]})")
+            for col, expected_value in self.special_columns[direction]['special_values'].items():
+                if col in columns_upper:
+                    actual_value = columns_upper[col][1].upper()
+                    if actual_value != expected_value.upper():
+                        warnings.append(f"특수 컬럼 '{col}'의 값이 '{expected_value}'이(가) 아닙니다. (현재 값: {columns_upper[col][1]})")
         
         return warnings
 
