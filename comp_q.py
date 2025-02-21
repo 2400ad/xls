@@ -18,29 +18,30 @@ class QueryDifference:
         })
 
 class QueryParser:
+    # 특수 컬럼 정의를 클래스 변수로 변경
+    special_columns = {
+        'send': {
+            'required': ['EAI_SEQ_ID', 'DATA_INTERFACE_TYPE_CODE'],
+            'mappings': []  # 추가 매핑을 저장할 리스트
+        },
+        'recv': {
+            'required': [
+                'EAI_SEQ_ID',
+                'DATA_INTERFACE_TYPE_CODE',
+                'EAI_INTERFACE_DATE',
+                'APPLICATION_TRANSFER_FLAG'
+            ],
+            'special_values': {
+                'EAI_INTERFACE_DATE': 'SYSDATE',
+                'APPLICATION_TRANSFER_FLAG': "'N'"
+            }
+        }
+    }
+
     def __init__(self):
         self.select_queries = []
         self.insert_queries = []
-        # 특수 컬럼 정의
-        self.special_columns = {
-            'send': {
-                'required': ['EAI_SEQ_ID', 'DATA_INTERFACE_TYPE_CODE'],
-                'mappings': []  # 추가 매핑을 저장할 리스트
-            },
-            'recv': {
-                'required': [
-                    'EAI_SEQ_ID',
-                    'DATA_INTERFACE_TYPE_CODE',
-                    'EAI_INTERFACE_DATE',
-                    'APPLICATION_TRANSFER_FLAG'
-                ],
-                'special_values': {
-                    'EAI_INTERFACE_DATE': 'SYSDATE',
-                    'APPLICATION_TRANSFER_FLAG': "'N'"
-                }
-            }
-        }
-    
+
     @staticmethod
     def normalize_query(query):
         """
@@ -187,13 +188,13 @@ class QueryParser:
         columns = {k.upper(): v for k, v in columns.items()}
         
         # 필수 특수 컬럼 체크
-        for col in self.special_columns[direction]['required']:
+        for col in QueryParser.special_columns[direction]['required']:
             if col not in columns:
                 warnings.append(f"필수 특수 컬럼 '{col}'이(가) {direction} 쿼리에 없습니다.")
         
         # 수신 쿼리의 특수 값 체크
         if direction == 'recv':
-            for col, expected_value in self.special_columns[direction]['special_values'].items():
+            for col, expected_value in QueryParser.special_columns[direction]['special_values'].items():
                 if col in columns and columns[col].upper() != expected_value.upper():
                     warnings.append(f"특수 컬럼 '{col}'의 값이 '{expected_value}'이(가) 아닙니다. (현재 값: {columns[col]})")
         
