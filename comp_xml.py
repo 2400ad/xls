@@ -141,22 +141,41 @@ class XMLComparator:
             file_results['recv']['query'], file_results['recv']['xml'] = \
                 self.extract_from_xml(interface_files['recv'])
         
-        # 쿼리 비교
+        # 쿼리 비교 및 특수 컬럼 체크
         comparisons = {
             'send': None,
             'recv': None
         }
         
+        warnings = {
+            'send': [],
+            'recv': []
+        }
+        
+        # 송신 쿼리 처리
         if excel_results['send_sql'] and file_results['send']['query']:
-            comparisons['send'] = self.compare_queries(
+            comparisons['send'] = self.query_parser.compare_queries(
                 excel_results['send_sql'],
                 file_results['send']['query']
             )
+            warnings['send'].extend(
+                self.query_parser.check_special_columns(
+                    file_results['send']['query'],
+                    'send'
+                )
+            )
             
+        # 수신 쿼리 처리
         if excel_results['recv_sql'] and file_results['recv']['query']:
-            comparisons['recv'] = self.compare_queries(
+            comparisons['recv'] = self.query_parser.compare_queries(
                 excel_results['recv_sql'],
                 file_results['recv']['query']
+            )
+            warnings['recv'].extend(
+                self.query_parser.check_special_columns(
+                    file_results['recv']['query'],
+                    'recv'
+                )
             )
         
         return {
@@ -164,7 +183,8 @@ class XMLComparator:
             'excel_results': excel_results,
             'file_results': file_results,
             'files': interface_files,
-            'comparisons': comparisons
+            'comparisons': comparisons,
+            'warnings': warnings
         }
         
     def process_all_interfaces(self) -> List[Dict]:
@@ -212,6 +232,7 @@ def main():
             file_results = result['file_results']
             files = result['files']
             comparisons = result['comparisons']
+            warnings = result['warnings']
             
             print(f"\n=== 인터페이스 {idx} ===")
             print(f"ID: {interface_info['interface_id']}")
@@ -243,6 +264,17 @@ def main():
                         print(f"    컬럼: {diff['column']}")
                         print(f"    Excel: {diff['query1_value']}")
                         print(f"    파일: {diff['query2_value']}")
+            
+            if warnings['send'] or warnings['recv']:
+                print("\n경고:")
+                if warnings['send']:
+                    print("송신 쿼리:")
+                    for warning in warnings['send']:
+                        print(f"  - {warning}")
+                if warnings['recv']:
+                    print("수신 쿼리:")
+                    for warning in warnings['recv']:
+                        print(f"  - {warning}")
             
             if excel_results['errors']:
                 print("\n오류:")

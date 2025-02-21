@@ -21,6 +21,25 @@ class QueryParser:
     def __init__(self):
         self.select_queries = []
         self.insert_queries = []
+        # 특수 컬럼 정의
+        self.special_columns = {
+            'send': {
+                'required': ['EAI_SEQ_ID', 'DATA_INTERFACE_TYPE_CODE'],
+                'mappings': []  # 추가 매핑을 저장할 리스트
+            },
+            'recv': {
+                'required': [
+                    'EAI_SEQ_ID',
+                    'DATA_INTERFACE_TYPE_CODE',
+                    'EAI_INTERFACE_DATE',
+                    'APPLICATION_TRANSFER_FLAG'
+                ],
+                'special_values': {
+                    'EAI_INTERFACE_DATE': 'SYSDATE',
+                    'APPLICATION_TRANSFER_FLAG': "'N'"
+                }
+            }
+        }
     
     @staticmethod
     def normalize_query(query):
@@ -102,69 +121,83 @@ class QueryParser:
             QueryDifference: Object containing comparison results and differences
         """
         result = QueryDifference()
-        q1 = QueryParser.normalize_query(query1)
-        q2 = QueryParser.normalize_query(query2)
         
-        # Check if both are SELECT queries
-        if q1.startswith('select') and q2.startswith('select'):
+        # 쿼리 정규화
+        norm_query1 = QueryParser.normalize_query(query1)
+        norm_query2 = QueryParser.normalize_query(query2)
+        
+        # 쿼리 타입 확인
+        if norm_query1.startswith('select'):
             result.query_type = 'SELECT'
-            cols1 = QueryParser.parse_select_columns(q1)
-            cols2 = QueryParser.parse_select_columns(q2)
-            
-            if cols1 is None or cols2 is None:
-                result.is_equal = False
-                return result
-            
-            # Compare columns
-            all_columns = set(cols1.keys()) | set(cols2.keys())
-            for col in all_columns:
-                if col not in cols1:
-                    result.add_difference(col, "missing", cols2[col])
-                elif col not in cols2:
-                    result.add_difference(col, cols1[col], "missing")
-                elif cols1[col] != cols2[col]:
-                    result.add_difference(col, cols1[col], cols2[col])
-            
-            # Compare FROM clause
-            from1 = re.search(r'from\s+.*', q1)
-            from2 = re.search(r'from\s+.*', q2)
-            if from1 and from2 and from1.group(0) != from2.group(0):
-                result.add_difference("FROM clause", from1.group(0), from2.group(0))
-            
-        # Check if both are INSERT queries
-        elif q1.startswith('insert') and q2.startswith('insert'):
+            columns1 = QueryParser.parse_select_columns(query1)
+            columns2 = QueryParser.parse_select_columns(query2)
+            table1 = QueryParser.extract_table_name(query1)
+            table2 = QueryParser.extract_table_name(query2)
+        elif norm_query1.startswith('insert'):
             result.query_type = 'INSERT'
-            parts1 = QueryParser.parse_insert_parts(q1)
-            parts2 = QueryParser.parse_insert_parts(q2)
-            
-            if parts1 is None or parts2 is None:
-                result.is_equal = False
-                return result
-            
-            table1, cols1 = parts1
-            table2, cols2 = parts2
-            
-            # Compare table names
-            if table1 != table2:
-                result.add_difference("Table", table1, table2)
-            
-            # Compare column-value pairs
-            all_columns = set(cols1.keys()) | set(cols2.keys())
-            for col in all_columns:
-                if col not in cols1:
-                    result.add_difference(col, "missing", cols2[col])
-                elif col not in cols2:
-                    result.add_difference(col, cols1[col], "missing")
-                elif cols1[col] != cols2[col]:
-                    result.add_difference(col, cols1[col], cols2[col])
-        
+            columns1 = QueryParser.parse_insert_parts(query1)[1]
+            columns2 = QueryParser.parse_insert_parts(query2)[1]
+            table1 = QueryParser.extract_table_name(query1)
+            table2 = QueryParser.extract_table_name(query2)
         else:
-            # If queries are of different types or not supported
-            result.query_type = 'UNKNOWN'
-            if q1 != q2:
-                result.add_difference("Full query", q1, q2)
+            raise ValueError("지원하지 않는 쿼리 타입입니다.")
+            
+        result.table_name = table1
         
+        # 특수 컬럼 제외
+        direction = 'recv' if result.query_type == 'INSERT' else 'send'
+        special_cols = set(QueryParser.special_columns[direction]['required'])
+        
+        # 일반 컬럼만 비교
+        columns1 = {k: v for k, v in columns1.items() if k.upper() not in special_cols}
+        columns2 = {k: v for k, v in columns2.items() if k.upper() not in special_cols}
+        
+        # 컬럼 비교
+        all_columns = set(columns1.keys()) | set(columns2.keys())
+        for col in all_columns:
+            if col not in columns1:
+                result.add_difference(col, None, columns2[col])
+            elif col not in columns2:
+                result.add_difference(col, columns1[col], None)
+            elif columns1[col] != columns2[col]:
+                result.add_difference(col, columns1[col], columns2[col])
+                
         return result
+
+    def check_special_columns(self, query: str, direction: str) -> List[str]:
+        """
+        특수 컬럼의 존재 여부와 값을 체크합니다.
+        
+        Args:
+            query (str): 검사할 쿼리
+            direction (str): 송신('send') 또는 수신('recv')
+            
+        Returns:
+            List[str]: 경고 메시지 리스트
+        """
+        warnings = []
+        norm_query = self.normalize_query(query)
+        
+        if direction == 'send':
+            columns = self.parse_select_columns(query)
+        else:
+            columns = self.parse_insert_parts(query)[1]
+        
+        # 대문자로 변환하여 비교
+        columns = {k.upper(): v for k, v in columns.items()}
+        
+        # 필수 특수 컬럼 체크
+        for col in self.special_columns[direction]['required']:
+            if col not in columns:
+                warnings.append(f"필수 특수 컬럼 '{col}'이(가) {direction} 쿼리에 없습니다.")
+        
+        # 수신 쿼리의 특수 값 체크
+        if direction == 'recv':
+            for col, expected_value in self.special_columns[direction]['special_values'].items():
+                if col in columns and columns[col].upper() != expected_value.upper():
+                    warnings.append(f"특수 컬럼 '{col}'의 값이 '{expected_value}'이(가) 아닙니다. (현재 값: {columns[col]})")
+        
+        return warnings
 
     def clean_select_query(self, query):
         """
