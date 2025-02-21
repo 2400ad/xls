@@ -130,15 +130,21 @@ class XMLComparator:
         """
         try:
             # Excel에서 인터페이스 정보 읽기
-            excel_results = read_interface_block(self.worksheet, start_col)
-            if not excel_results:
+            interface_info = read_interface_block(self.worksheet, start_col)
+            if not interface_info:
                 print(f"Warning: Failed to read interface block at column {start_col}")
                 return None
                 
+            # Excel에서 추출된 쿼리와 XML 얻기
+            excel_results = process_interface(interface_info, self.mapper)
+            if not excel_results:
+                print(f"Warning: Failed to process interface at column {start_col}")
+                return None
+                
             # 송수신 파일 찾기
-            file_results = self.find_interface_files(excel_results['if_id'])
+            file_results = self.find_interface_files(interface_info['interface_id'])
             if not file_results:
-                print(f"Warning: No interface files found for IF_ID: {excel_results['if_id']}")
+                print(f"Warning: No interface files found for IF_ID: {interface_info['interface_id']}")
                 return None
                 
             # 결과 초기화
@@ -188,7 +194,8 @@ class XMLComparator:
                     print(f"File query: {file_results['recv']['query']}")
             
             return {
-                'if_id': excel_results['if_id'],
+                'if_id': interface_info['interface_id'],
+                'interface_name': interface_info['interface_name'],
                 'comparisons': comparisons,
                 'warnings': warnings,
                 'excel': excel_results,
@@ -198,7 +205,7 @@ class XMLComparator:
         except Exception as e:
             print(f"Error processing interface block at column {start_col}: {e}")
             return None
-        
+            
     def process_all_interfaces(self) -> List[Dict]:
         """
         Excel 파일의 모든 인터페이스를 처리합니다.
@@ -208,16 +215,43 @@ class XMLComparator:
             List[Dict]: 각 인터페이스의 처리 결과 목록
         """
         results = []
-        current_col = 2  # B열부터 시작
+        col = 2  # B열부터 시작
         
-        while current_col <= self.worksheet.max_column:
-            result = self.process_interface_block(current_col)
-            if not result:
+        while True:
+            # 인터페이스 ID가 없으면 종료
+            if not self.worksheet.cell(row=2, column=col).value:
                 break
                 
-            results.append(result)
-            current_col += 3  # 다음 인터페이스 블록으로 이동 (3컬럼 단위)
+            result = self.process_interface_block(col)
+            if result:
+                results.append(result)
+                
+            col += 3  # 다음 인터페이스 블록으로 이동
             
+        # 결과 출력
+        for idx, result in enumerate(results, 1):
+            print(f"\n=== 인터페이스 {idx} ===")
+            print(f"ID: {result['if_id']}")
+            print(f"이름: {result['interface_name']}")
+            
+            print("\n파일 검색 결과:")
+            print(f"송신 파일: {result['files']['send']}")
+            print(f"수신 파일: {result['files']['recv']}")
+            
+            print("\n쿼리 비교 결과:")
+            if result['comparisons']['send']:
+                print("송신 쿼리:")
+                print(result['comparisons']['send'])
+            if result['comparisons']['recv']:
+                print("수신 쿼리:")
+                print(result['comparisons']['recv'])
+            
+            print("\n경고:")
+            if result['warnings']['send']:
+                print("송신:", result['warnings']['send'])
+            if result['warnings']['recv']:
+                print("수신:", result['warnings']['recv'])
+                
         return results
         
     def close(self):
@@ -237,61 +271,6 @@ def main():
     try:
         results = comparator.process_all_interfaces()
         
-        # 결과 출력
-        for idx, result in enumerate(results, 1):
-            if_id = result['if_id']
-            comparisons = result['comparisons']
-            warnings = result['warnings']
-            excel_results = result['excel']
-            files = result['files']
-            
-            print(f"\n=== 인터페이스 {idx} ===")
-            print(f"ID: {if_id}")
-            print(f"이름: {excel_results['interface_name']}")
-            
-            print("\n파일 검색 결과:")
-            print(f"송신 파일: {files['send']}")
-            print(f"수신 파일: {files['recv']}")
-            
-            print("\n쿼리 비교 결과:")
-            if comparisons['send']:
-                print("송신 쿼리:")
-                if comparisons['send'].is_equal:
-                    print("  일치")
-                else:
-                    print("  불일치:")
-                    for diff in comparisons['send'].differences:
-                        print(f"    컬럼: {diff['column']}")
-                        print(f"    Excel: {diff['query1_value']}")
-                        print(f"    파일: {diff['query2_value']}")
-                        
-            if comparisons['recv']:
-                print("수신 쿼리:")
-                if comparisons['recv'].is_equal:
-                    print("  일치")
-                else:
-                    print("  불일치:")
-                    for diff in comparisons['recv'].differences:
-                        print(f"    컬럼: {diff['column']}")
-                        print(f"    Excel: {diff['query1_value']}")
-                        print(f"    파일: {diff['query2_value']}")
-            
-            if warnings['send'] or warnings['recv']:
-                print("\n경고:")
-                if warnings['send']:
-                    print("송신 쿼리:")
-                    for warning in warnings['send']:
-                        print(f"  - {warning}")
-                if warnings['recv']:
-                    print("수신 쿼리:")
-                    for warning in warnings['recv']:
-                        print(f"  - {warning}")
-            
-            if excel_results['errors']:
-                print("\n오류:")
-                for error in excel_results['errors']:
-                    print(f"  - {error}")
-                    
     finally:
         comparator.close()
 
