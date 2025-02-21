@@ -85,38 +85,70 @@ class XMLComparator:
             return None
         return self.query_parser.compare_queries(query1, query2)
         
-    def find_interface_files(self, if_id: str) -> Dict[str, str]:
+    def find_interface_files(self, if_id: str) -> Dict[str, Dict]:
         """
-        주어진 IF ID에 해당하는 송수신 XML 파일을 찾습니다.
+        주어진 IF ID에 해당하는 송수신 XML 파일을 찾고 쿼리를 추출합니다.
         파일명 패턴: {if_id}로 시작하고 .SND.xml 또는 .RCV.xml로 끝나는 파일
         
         Args:
             if_id (str): 인터페이스 ID
             
         Returns:
-            Dict[str, str]: {'send': 송신파일경로, 'recv': 수신파일경로}
+            Dict[str, Dict]: {
+                'send': {'path': 송신파일경로, 'query': 송신쿼리, 'xml': 송신XML},
+                'recv': {'path': 수신파일경로, 'query': 수신쿼리, 'xml': 수신XML}
+            }
         """
-        files = {'send': None, 'recv': None}
+        results = {
+            'send': {'path': None, 'query': None, 'xml': None},
+            'recv': {'path': None, 'query': None, 'xml': None}
+        }
         
-        # 파일명 패턴 생성
-        snd_pattern = f"{if_id}*.SND.xml"
-        rcv_pattern = f"{if_id}*.RCV.xml"
-        
-        # 디렉토리 검색
-        for root, _, filenames in os.walk(self.search_dir):
-            for filename in filenames:
-                if fnmatch.fnmatch(filename, snd_pattern):
-                    files['send'] = os.path.join(root, filename)
-                elif fnmatch.fnmatch(filename, rcv_pattern):
-                    files['recv'] = os.path.join(root, filename)
+        if not if_id:
+            print("Warning: Empty IF_ID provided")
+            return results
+            
+        try:
+            # 디렉토리 내의 모든 XML 파일 검색
+            for file in os.listdir(self.search_dir):
+                if not file.startswith(if_id):
+                    continue
                     
-                # 두 파일을 모두 찾았으면 검색 종료
-                if files['send'] and files['recv']:
-                    break
-            if files['send'] and files['recv']:
-                break
+                file_path = os.path.join(self.search_dir, file)
                 
-        return files
+                # 송신 파일 (.SND.xml)
+                if file.endswith('.SND.xml'):
+                    results['send']['path'] = file_path
+                    query, xml = self.extract_from_xml(file_path)
+                    if query and xml:
+                        results['send']['query'] = query
+                        results['send']['xml'] = xml
+                    else:
+                        print(f"Warning: Failed to extract query from send file: {file_path}")
+                
+                # 수신 파일 (.RCV.xml)
+                elif file.endswith('.RCV.xml'):
+                    results['recv']['path'] = file_path
+                    query, xml = self.extract_from_xml(file_path)
+                    if query and xml:
+                        results['recv']['query'] = query
+                        results['recv']['xml'] = xml
+                    else:
+                        print(f"Warning: Failed to extract query from receive file: {file_path}")
+            
+            # 파일을 찾았는지 확인
+            if not results['send']['path'] and not results['recv']['path']:
+                print(f"Warning: No interface files found for IF_ID: {if_id}")
+            elif not results['send']['path']:
+                print(f"Warning: No send file found for IF_ID: {if_id}")
+            elif not results['recv']['path']:
+                print(f"Warning: No receive file found for IF_ID: {if_id}")
+            
+            return results
+            
+        except Exception as e:
+            print(f"Error finding interface files: {e}")
+            return results
         
     def process_interface_block(self, start_col: int) -> Optional[Dict]:
         """
@@ -235,8 +267,8 @@ class XMLComparator:
             print(f"이름: {result['interface_name']}")
             
             print("\n파일 검색 결과:")
-            print(f"송신 파일: {result['files']['send']}")
-            print(f"수신 파일: {result['files']['recv']}")
+            print(f"송신 파일: {result['files']['send']['path']}")
+            print(f"수신 파일: {result['files']['recv']['path']}")
             
             print("\n쿼리 비교 결과:")
             if result['comparisons']['send']:
