@@ -42,8 +42,7 @@ class QueryParser:
         self.select_queries = []
         self.insert_queries = []
 
-    @staticmethod
-    def normalize_query(query):
+    def normalize_query(self, query):
         """
         Normalize a SQL query by removing extra whitespace and standardizing format
         
@@ -68,8 +67,7 @@ class QueryParser:
         
         return query.strip()
 
-    @staticmethod
-    def parse_select_columns(query) -> Optional[Dict[str, str]]:
+    def parse_select_columns(self, query) -> Optional[Dict[str, str]]:
         """Extract columns from SELECT query and return as dictionary"""
         # 대소문자 구분 없이 SELECT와 FROM 사이의 부분을 찾되, 원본 대소문자는 유지
         match = re.match(r'(?i)select\s+(.+?)\s+from', query)
@@ -83,8 +81,7 @@ class QueryParser:
             columns[col] = col
         return columns
 
-    @staticmethod
-    def parse_insert_parts(query) -> Optional[Tuple[str, Dict[str, str]]]:
+    def parse_insert_parts(self, query) -> Optional[Tuple[str, Dict[str, str]]]:
         """Extract and return table name and column-value pairs from INSERT query"""
         # Extract table name (case-insensitive match but preserve original case)
         table_match = re.search(r'(?i)insert\s+into\s+(\w+\.?\w+)\s*\(', query)
@@ -106,8 +103,7 @@ class QueryParser:
             
         return table_name, columns
 
-    @staticmethod
-    def compare_queries(query1: str, query2: str) -> QueryDifference:
+    def compare_queries(self, query1: str, query2: str) -> QueryDifference:
         """
         Compare two SQL queries and return detailed differences
         
@@ -121,22 +117,22 @@ class QueryParser:
         result = QueryDifference()
         
         # 쿼리 정규화
-        norm_query1 = QueryParser.normalize_query(query1)
-        norm_query2 = QueryParser.normalize_query(query2)
+        norm_query1 = self.normalize_query(query1)
+        norm_query2 = self.normalize_query(query2)
         
         # 쿼리 타입 확인 (대소문자 구분 없이)
         if re.match(r'(?i)select', norm_query1):
             result.query_type = 'SELECT'
-            columns1 = QueryParser.parse_select_columns(query1)
-            columns2 = QueryParser.parse_select_columns(query2)
-            table1 = QueryParser.extract_table_name(query1)
-            table2 = QueryParser.extract_table_name(query2)
+            columns1 = self.parse_select_columns(query1)
+            columns2 = self.parse_select_columns(query2)
+            table1 = self.extract_table_name(query1)
+            table2 = self.extract_table_name(query2)
         elif re.match(r'(?i)insert', norm_query1):
             result.query_type = 'INSERT'
-            _, columns1 = QueryParser.parse_insert_parts(query1)
-            _, columns2 = QueryParser.parse_insert_parts(query2)
-            table1 = QueryParser.extract_table_name(query1)
-            table2 = QueryParser.extract_table_name(query2)
+            _, columns1 = self.parse_insert_parts(query1)
+            _, columns2 = self.parse_insert_parts(query2)
+            table1 = self.extract_table_name(query1)
+            table2 = self.extract_table_name(query2)
         else:
             raise ValueError("지원하지 않는 쿼리 타입입니다.")
             
@@ -226,8 +222,7 @@ class QueryParser:
             return insert_match.group(0).strip()
         return query.strip()
 
-    @staticmethod
-    def is_meaningful_query(query: str) -> bool:
+    def is_meaningful_query(self, query: str) -> bool:
         """
         Check if a query is meaningful (not just a simple existence check or count)
         
@@ -270,8 +265,7 @@ class QueryParser:
         
         return True
 
-    @classmethod
-    def find_files_by_table(cls, folder_path: str, table_name: str, skip_meaningless: bool = True) -> dict:
+    def find_files_by_table(self, folder_path: str, table_name: str, skip_meaningless: bool = True) -> dict:
         """
         Find files containing queries that reference the specified table
         
@@ -295,7 +289,7 @@ class QueryParser:
         table_name = table_name.lower()
         
         # Create parser instance for processing files
-        parser = cls()
+        parser = self
         
         # Walk through all files in the folder
         for root, _, files in os.walk(folder_path):
@@ -308,20 +302,20 @@ class QueryParser:
                     
                 try:
                     # Try to parse queries from the file
-                    select_queries, insert_queries = parser.parse_xml_file(file_path)
+                    select_queries, insert_queries = self.parse_xml_file(file_path)
                     
                     # Check SELECT queries
                     for query in select_queries:
-                        if cls.extract_table_name(query).lower() == table_name:
+                        if self.extract_table_name(query).lower() == table_name:
                             # Skip meaningless queries if requested
-                            if skip_meaningless and not cls.is_meaningful_query(query):
+                            if skip_meaningless and not self.is_meaningful_query(query):
                                 continue
                             rel_path = os.path.relpath(file_path, folder_path)
                             results['select'].append((rel_path, query))
                     
                     # Check INSERT queries
                     for query in insert_queries:
-                        if cls.extract_table_name(query).lower() == table_name:
+                        if self.extract_table_name(query).lower() == table_name:
                             rel_path = os.path.relpath(file_path, folder_path)
                             results['insert'].append((rel_path, query))
                     
@@ -388,8 +382,7 @@ class QueryParser:
         for i, query in enumerate(self.insert_queries, 1):
             print(f"{i}. {query}\n")
 
-    @staticmethod
-    def print_query_differences(diff: QueryDifference):
+    def print_query_differences(self, diff: QueryDifference):
         """Print the differences between two queries in a readable format"""
         print(f"\nQuery Type: {diff.query_type}")
         if diff.is_equal:
@@ -401,8 +394,7 @@ class QueryParser:
                 print(f"  Query 1: {d['query1_value']}")
                 print(f"  Query 2: {d['query2_value']}")
 
-    @staticmethod
-    def extract_table_name(query: str) -> str:
+    def extract_table_name(self, query: str) -> str:
         """
         Extract table name from a SQL query
         
@@ -412,7 +404,7 @@ class QueryParser:
         Returns:
             str: Table name or empty string if not found
         """
-        query = QueryParser.normalize_query(query)
+        query = self.normalize_query(query)
         
         # For SELECT queries
         select_match = re.search(r'from\s+([a-zA-Z0-9_$.]+)', query)
@@ -426,8 +418,7 @@ class QueryParser:
             
         return ""
 
-    @classmethod
-    def print_table_search_results(cls, results: dict, table_name: str):
+    def print_table_search_results(self, results: dict, table_name: str):
         """
         Print table search results in a formatted way
         
@@ -523,38 +514,41 @@ class FileSearcher:
 
 # Test the query comparison
 if __name__ == "__main__":
+    # Create QueryParser instance
+    parser = QueryParser()
+    
     # Test SELECT queries with different column orders
     select1 = """
-    select a, b, c from d
+    SELECT a, b, c FROM d
     """
     select2 = """
-    select b, a, c 
-    from d
+    SELECT b, a, c 
+    FROM d
     """
     
     # Test INSERT queries with different values
     insert1 = """
-    INSERT INTO table1 (a, b, c) values ( :a, 'N', :code)
+    INSERT INTO table1 (a, b, c) VALUES ( :a, 'N', :code)
     """
     insert2 = """
     INSERT INTO table1 (a, c, b) 
-    values 
+    VALUES 
     ( :a, :code, 'Y')
     """
     
     # Compare queries and print differences
-    select_diff = QueryParser.compare_queries(select1, select2)
-    insert_diff = QueryParser.compare_queries(insert1, insert2)
+    select_diff = parser.compare_queries(select1, select2)
+    insert_diff = parser.compare_queries(insert1, insert2)
     
     print("\nComparing SELECT queries:")
     print(f"Query 1:\n{select1}")
     print(f"Query 2:\n{select2}")
-    QueryParser.print_query_differences(select_diff)
+    parser.print_query_differences(select_diff)
     
     print("\nComparing INSERT queries:")
     print(f"Query 1:\n{insert1}")
     print(f"Query 2:\n{insert2}")
-    QueryParser.print_query_differences(insert_diff)
+    parser.print_query_differences(insert_diff)
 
     # Test with the example queries from the previous test
     qry1 = """
@@ -579,7 +573,6 @@ if __name__ == "__main__":
     INSERT INTO A2EDC_MGR.TB_EDC_IFI_ECO_TARGET_GLS_N_I (
          EAI_SEQ_ID, 
          DATA_INTERFACE_TYPE_CODE,
-
          EAI_INTERFACE_DATE, APPLICATION_TRANSFER_FLAG,
          ECO_ID, VALIDATION_SEQS,
          EMEMO_ID, LOT_ID,
@@ -598,9 +591,11 @@ if __name__ == "__main__":
     )
     """
     
-    complex_diff = QueryParser.compare_queries(qry1, qry2)
+    complex_diff = parser.compare_queries(qry1, qry2)
     print("\nComparing complex INSERT queries:")
-    QueryParser.print_query_differences(complex_diff)
+    print(f"Query 1:\n{qry1}")
+    print(f"Query 2:\n{qry2}")
+    parser.print_query_differences(complex_diff)
 
     # Test with XML file if provided
     try:
