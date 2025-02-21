@@ -232,18 +232,29 @@ class QueryParser:
             return query[:where_match.start()].strip()
         return query.strip()
 
-    def clean_insert_query(self, query):
+    def clean_insert_query(self, query: str) -> str:
         """
         Clean INSERT query by removing PL/SQL blocks
         """
-        # Extract only the INSERT ... VALUES part
+        # PL/SQL 블록에서 INSERT 문 추출
+        pattern = r"""
+            (?:BEGIN\s+)?          # BEGIN (optional)
+            (INSERT\s+INTO\s+      # INSERT INTO
+            [^;]+                  # everything until semicolon
+            )                      # capture this part
+            (?:\s*;)?             # optional semicolon
+            (?:\s*EXCEPTION\s+     # EXCEPTION block (optional)
+            .*?                    # everything until END
+            END;?)?                # END with optional semicolon
+        """
         insert_match = re.search(
-            r'INSERT\s+INTO\s+[^;]+VALUES\s*\([^)]+\)',
+            pattern,
             query,
-            flags=re.IGNORECASE | re.MULTILINE | re.DOTALL
+            flags=re.IGNORECASE | re.MULTILINE | re.DOTALL | re.VERBOSE
         )
+        
         if insert_match:
-            return insert_match.group(0).strip()
+            return insert_match.group(1).strip()
         return query.strip()
 
     def is_meaningful_query(self, query: str) -> bool:
