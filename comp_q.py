@@ -72,8 +72,8 @@ class QueryParser:
         # 정규화된 쿼리 사용
         query = self.normalize_query(query)
         
-        # SELECT와 FROM 사이의 컬럼 추출 (대소문자 구분 없이)
-        match = re.search(r'(?i)SELECT\s+(.*?)\s+FROM', query)
+        # SELECT와 FROM 사이의 컬럼 추출
+        match = re.search(r'SELECT\s+(.*?)\s+FROM', query, flags=re.IGNORECASE)
         if not match:
             return None
             
@@ -89,15 +89,15 @@ class QueryParser:
         # 정규화된 쿼리 사용
         query = self.normalize_query(query)
         
-        # INSERT INTO와 테이블 이름 추출 (대소문자 구분 없이)
-        table_match = re.search(r'(?i)INSERT\s+INTO\s+([A-Za-z0-9_$.]+)', query)
+        # INSERT INTO와 테이블 이름 추출
+        table_match = re.search(r'INSERT\s+INTO\s+([A-Za-z0-9_$.]+)', query, flags=re.IGNORECASE)
         if not table_match:
             return None
         table_name = table_match.group(1)
         
         # 컬럼과 값 추출
-        pattern = r'\((.*?)\)\s*(?i)VALUES\s*\((.*?)\)'
-        cols_match = re.search(pattern, query, re.DOTALL)
+        pattern = r'\((.*?)\)\s*VALUES\s*\((.*?)\)'
+        cols_match = re.search(pattern, query, flags=re.IGNORECASE | re.DOTALL)
         if not cols_match:
             return None
             
@@ -136,8 +136,8 @@ class QueryParser:
         norm_query1 = self.normalize_query(query1)
         norm_query2 = self.normalize_query(query2)
         
-        # 쿼리 타입 확인 (대소문자 구분 없이)
-        if re.match(r'(?i)SELECT', norm_query1):
+        # 쿼리 타입 확인
+        if re.search(r'SELECT', norm_query1, flags=re.IGNORECASE):
             result.query_type = 'SELECT'
             columns1 = self.parse_select_columns(query1)
             columns2 = self.parse_select_columns(query2)
@@ -147,7 +147,7 @@ class QueryParser:
             if columns1 is None or columns2 is None:
                 raise ValueError("SELECT 쿼리 파싱 실패")
                 
-        elif re.match(r'(?i)INSERT', norm_query1):
+        elif re.search(r'INSERT', norm_query1, flags=re.IGNORECASE):
             result.query_type = 'INSERT'
             insert_result1 = self.parse_insert_parts(query1)
             insert_result2 = self.parse_insert_parts(query2)
@@ -226,7 +226,7 @@ class QueryParser:
         Clean SELECT query by removing WHERE clause
         """
         # Find the position of WHERE (case insensitive)
-        where_match = re.search(r'\sWHERE\s', query, re.IGNORECASE)
+        where_match = re.search(r'\sWHERE\s', query, flags=re.IGNORECASE)
         if where_match:
             # Return only the part before WHERE
             return query[:where_match.start()].strip()
@@ -240,7 +240,7 @@ class QueryParser:
         insert_match = re.search(
             r'INSERT\s+INTO\s+[^;]+VALUES\s*\([^)]+\)',
             query,
-            re.IGNORECASE | re.MULTILINE | re.DOTALL
+            flags=re.IGNORECASE | re.MULTILINE | re.DOTALL
         )
         if insert_match:
             return insert_match.group(0).strip()
@@ -373,11 +373,11 @@ class QueryParser:
                 if elem.text:
                     text = elem.text.strip()
                     # Extract SELECT queries
-                    if re.search(r'SELECT\s+', text, re.IGNORECASE):
+                    if re.search(r'SELECT\s+', text, flags=re.IGNORECASE):
                         cleaned_query = self.clean_select_query(text)
                         self.select_queries.append(cleaned_query)
                     # Extract INSERT queries
-                    elif re.search(r'INSERT\s+INTO\s+', text, re.IGNORECASE):
+                    elif re.search(r'INSERT\s+INTO\s+', text, flags=re.IGNORECASE):
                         cleaned_query = self.clean_insert_query(text)
                         self.insert_queries.append(cleaned_query)
             
@@ -431,12 +431,12 @@ class QueryParser:
         query = self.normalize_query(query)
         
         # For SELECT queries
-        select_match = re.search(r'from\s+([a-zA-Z0-9_$.]+)', query)
+        select_match = re.search(r'from\s+([a-zA-Z0-9_$.]+)', query, flags=re.IGNORECASE)
         if select_match:
             return select_match.group(1)
             
         # For INSERT queries
-        insert_match = re.search(r'insert\s+into\s+([a-zA-Z0-9_$.]+)', query)
+        insert_match = re.search(r'insert\s+into\s+([a-zA-Z0-9_$.]+)', query, flags=re.IGNORECASE)
         if insert_match:
             return insert_match.group(1)
             
