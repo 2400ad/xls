@@ -1,6 +1,6 @@
 import openpyxl
 from xltest import read_interface_block, process_interface
-from comp_q import QueryParser, QueryDifference
+from comp_q import QueryParser, QueryDifference, FileSearcher
 from maptest import ColumnMapper
 import xml.etree.ElementTree as ET
 from typing import Dict, List, Optional, Tuple
@@ -9,6 +9,9 @@ import fnmatch
 import sys
 
 class XMLComparator:
+    # 클래스 변수로 BW_SEARCH_DIR 정의
+    BW_SEARCH_DIR = "C:\\work\\LT\\BW소스"
+
     def __init__(self, excel_path: str, search_dir: str):
         """
         XML 비교를 위한 클래스 초기화
@@ -301,8 +304,6 @@ class XMLComparator:
         if self.mapper:
             self.mapper.close_connections()
 
-    BW_SEARCH_DIR = "C:\\work\\LT\\BW소스"  # BW 프로세스 파일이 있는 디렉토리 경로
-
     def find_bw_files(self) -> List[Dict[str, str]]:
         """
         엑셀의 인터페이스 정보에서 송신 테이블명을 추출하여 BW 파일을 검색합니다.
@@ -332,8 +333,8 @@ class XMLComparator:
             if not send_table:
                 continue
                 
-            # BW 파일 검색
-            bw_files = file_searcher.find_files_with_keywords(BW_SEARCH_DIR, [send_table])
+            # BW 파일 검색 - self.BW_SEARCH_DIR 사용
+            bw_files = file_searcher.find_files_with_keywords(self.BW_SEARCH_DIR, [send_table])
             matching_files = bw_files.get(send_table, [])
             
             results.append({
