@@ -786,18 +786,19 @@ class BWQueryExtractor:
                 statement = activity.find('.//config/statement')
                 if statement is not None and statement.text:
                     query = statement.text.strip()
-                    print(f"\n원본 쿼리 발견:\n{query}")
+                    print(f"\n발견된 쿼리:\n{query}")
                     
-                    # 유효한 쿼리인지 확인
+                    # 1. 유효한 쿼리인지 먼저 확인
                     if not self._is_valid_query(query):
+                        print("=> FROM DUAL 쿼리이므로 제외")
                         continue
                         
-                    # Oracle 힌트 제거
-                    query = self._remove_oracle_hints(query)
-                    print(f"처리된 쿼리:\n{query}")
-                    queries.append(query)
+                    # 2. 유효한 쿼리에 대해서만 Oracle 힌트 제거
+                    cleaned_query = self._remove_oracle_hints(query)
+                    print(f"=> 최종 처리된 쿼리:\n{cleaned_query}")
+                    queries.append(cleaned_query)
             
-            print(f"\n=== 처리된 총 쿼리 수: {len(queries)} ===")
+            print(f"\n=== 처리된 유효한 쿼리 수: {len(queries)} ===")
             
         except ET.ParseError as e:
             print(f"XML 파싱 오류: {e}")
