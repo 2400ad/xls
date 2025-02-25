@@ -301,7 +301,7 @@ class XMLComparator:
         if self.mapper:
             self.mapper.close_connections()
 
-    BW_SEARCH_DIR = "D:/bw_processes"  # BW 프로세스 파일이 있는 디렉토리 경로
+    BW_SEARCH_DIR = "C:\\work\\LT\\BW소스"  # BW 프로세스 파일이 있는 디렉토리 경로
 
     def find_bw_files(self) -> List[Dict[str, str]]:
         """
@@ -368,6 +368,7 @@ def main():
 
     excel_path = sys.argv[1]
     xml_dir = sys.argv[2]
+    bw_dir = sys.argv[3]
 
     comparator = XMLComparator(excel_path, xml_dir)
     
