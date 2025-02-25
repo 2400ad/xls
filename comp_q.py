@@ -506,6 +506,100 @@ class QueryParser:
         
         print("\n" + "=" * 50)
 
+class BWQueryExtractor:
+    """TIBCO BW XML 파일에서 특정 태그 구조에 따라 SQL 쿼리를 추출하는 클래스"""
+    
+    def __init__(self):
+        self.ns = {
+            'pd': 'http://xmlns.tibco.com/bw/process/2003',
+            'xsl': 'http://www.w3.org/1999/XSL/Transform'
+        }
+    
+    def extract_send_query(self, xml_path: str) -> List[str]:
+        """
+        송신용 XML에서 SQL 쿼리 추출
+        경로: <pd:ProcessDefinition> -> <pd:group name="Group"> -> <pd:activity name="SelectP"> -> <config> -> <statement>
+        
+        Args:
+            xml_path (str): XML 파일 경로
+            
+        Returns:
+            List[str]: 추출된 SELECT 쿼리 목록
+        """
+        queries = []
+        try:
+            tree = ET.parse(xml_path)
+            root = tree.getroot()
+            
+            # 송신 쿼리 추출 (Group 내의 SelectP 활동)
+            select_activities = root.findall('.//pd:group[@name="Group"]//pd:activity[@name="SelectP"]', self.ns)
+            
+            for activity in select_activities:
+                statement = activity.find('.//config/statement')
+                if statement is not None and statement.text:
+                    query = statement.text.strip()
+                    if query.lower().startswith('select'):
+                        queries.append(query)
+            
+        except ET.ParseError as e:
+            print(f"XML 파싱 오류: {e}")
+        except Exception as e:
+            print(f"쿼리 추출 중 오류 발생: {e}")
+            
+        return queries
+    
+    def extract_recv_query(self, xml_path: str) -> List[str]:
+        """
+        수신용 XML에서 SQL 쿼리 추출
+        경로: <pd:ProcessDefinition> -> <pd:activity name="InsertAll"> -> <config> -> <statement>
+        
+        Args:
+            xml_path (str): XML 파일 경로
+            
+        Returns:
+            List[str]: 추출된 INSERT 쿼리 목록
+        """
+        queries = []
+        try:
+            tree = ET.parse(xml_path)
+            root = tree.getroot()
+            
+            # 수신 쿼리 추출 (InsertAll 활동)
+            insert_activities = root.findall('.//pd:activity[@name="InsertAll"]', self.ns)
+            
+            for activity in insert_activities:
+                statement = activity.find('.//config/statement')
+                if statement is not None and statement.text:
+                    query = statement.text.strip()
+                    if query.lower().startswith('insert'):
+                        queries.append(query)
+            
+        except ET.ParseError as e:
+            print(f"XML 파싱 오류: {e}")
+        except Exception as e:
+            print(f"쿼리 추출 중 오류 발생: {e}")
+            
+        return queries
+    
+    def extract_bw_queries(self, xml_path: str) -> Dict[str, List[str]]:
+        """
+        TIBCO BW XML 파일에서 송신/수신 쿼리를 모두 추출
+        
+        Args:
+            xml_path (str): XML 파일 경로
+            
+        Returns:
+            Dict[str, List[str]]: 송신/수신 쿼리 목록
+                {
+                    'send': [select 쿼리 목록],
+                    'recv': [insert 쿼리 목록]
+                }
+        """
+        return {
+            'send': self.extract_send_query(xml_path),
+            'recv': self.extract_recv_query(xml_path)
+        }
+
 class FileSearcher:
     @staticmethod
     def find_files_with_keywords(folder_path: str, keywords: list) -> dict:
