@@ -1,13 +1,12 @@
 import openpyxl
 from xltest import read_interface_block, process_interface
-from comp_q import QueryParser, QueryDifference, FileSearcher
+from comp_q import QueryParser, QueryDifference, FileSearcher, BWParser
 from maptest import ColumnMapper
 import xml.etree.ElementTree as ET
 from typing import Dict, List, Optional, Tuple
 import os
 import fnmatch
 import sys
-from xml_parse1 import BWQueryExtractor
 
 class XMLComparator:
     # 클래스 변수로 BW_SEARCH_DIR 정의
@@ -385,7 +384,7 @@ def main():
     # BW 파일에서 쿼리 추출
     print("\n[BW 파일 쿼리 추출]")
     print("-" * 80)
-    extractor = BWQueryExtractor()
+    bw_parser = BWParser()
     for result in bw_results:
         if result['bw_files']:  # BW 파일이 있는 경우에만 처리
             print(f"\n인터페이스: {result['interface_name']} ({result['interface_id']})")
@@ -394,7 +393,7 @@ def main():
             for bw_file in result['bw_files']:
                 bw_file_path = os.path.join(bw_dir, bw_file)
                 if os.path.exists(bw_file_path):
-                    query = extractor.get_single_query(bw_file_path)
+                    query = bw_parser.get_single_query(bw_file_path)
                     if query:
                         print(f"\nBW 파일: {bw_file}")
                         print("-" * 40)
