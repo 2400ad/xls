@@ -740,6 +740,27 @@ class BWQueryExtractor:
             
         return queries
 
+    def _is_valid_query(self, query: str) -> bool:
+        """
+        분석 대상이 되는 유효한 쿼리인지 확인
+        
+        Args:
+            query (str): SQL 쿼리
+            
+        Returns:
+            bool: 유효한 쿼리이면 True
+        """
+        # 소문자로 변환하여 검사
+        query_lower = query.lower()
+        
+        # SELECT FROM DUAL 패턴 체크
+        if query_lower.startswith('select') and 'from dual' in query_lower:
+            print(f"\n=== 단순 쿼리 제외 ===")
+            print(f"제외된 쿼리: {query}")
+            return False
+            
+        return True
+
     def extract_send_query(self, xml_path: str) -> List[str]:
         """
         송신용 XML에서 SQL 쿼리 추출
@@ -755,17 +776,29 @@ class BWQueryExtractor:
             tree = ET.parse(xml_path)
             root = tree.getroot()
             
-            # 송신 쿼리 추출 (Group 내의 SelectP 활동)
-            select_activities = root.findall('.//pd:group[@name="Group"]//pd:activity[@name="SelectP"]', self.ns)
+            # JDBC 액티비티 찾기
+            activities = root.findall('.//pd:activity', self.ns)
             
-            for activity in select_activities:
+            for activity in activities:
+                # JDBC 액티비티 타입 확인
+                activity_type = activity.find('./pd:type', self.ns)
+                if activity_type is None or 'jdbc' not in activity_type.text.lower():
+                    continue
+                    
+                # statement 추출
                 statement = activity.find('.//config/statement')
                 if statement is not None and statement.text:
                     query = statement.text.strip()
                     if query.lower().startswith('select'):
+                        # 유효한 쿼리인지 확인
+                        if not self._is_valid_query(query):
+                            continue
+                            
                         # Oracle 힌트 제거
-                        query = QueryParser()._remove_oracle_hints(query)
-                    queries.append(query)
+                        query = self._remove_oracle_hints(query)
+                        print(f"\n=== 유효한 SELECT 쿼리 발견 ===")
+                        print(f"쿼리: {query}")
+                        queries.append(query)
             
         except ET.ParseError as e:
             print(f"XML 파싱 오류: {e}")
