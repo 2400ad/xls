@@ -529,40 +529,77 @@ class BWQueryExtractor:
         param_names = []
         prepared_params = activity.find('.//prepared_Param_DataType')
         if prepared_params is not None:
+            print("\n=== prepared_Param_DataType 태그 발견 ===")
             for param in prepared_params.findall('./parameter'):
                 param_name = param.find('./parameterName')
                 if param_name is not None and param_name.text:
-                    param_names.append(param_name.text.strip())
+                    name = param_name.text.strip()
+                    param_names.append(name)
+                    print(f"파라미터 이름 추출: {name}")
+        else:
+            print("\n=== prepared_Param_DataType 태그를 찾을 수 없음 ===")
+        
         return param_names
 
-    def _get_parameter_mappings(self, activity, param_names: List[str]) -> Dict[str, str]:
+    def _replace_with_param_names(self, query: str, param_names: List[str]) -> str:
         """
-        inputBindings에서 파라미터 매핑 정보 추출
+        1단계: SQL 쿼리의 ? 플레이스홀더를 prepared_Param_DataType의 파라미터 이름으로 대체
+        
+        Args:
+            query (str): 원본 SQL 쿼리
+            param_names (List[str]): 파라미터 이름 목록
+            
+        Returns:
+            str: 파라미터 이름이 대체된 SQL 쿼리
+        """
+        parts = query.split('?')
+        if len(parts) == 1:  # 플레이스홀더가 없는 경우
+            return query
+            
+        result = parts[0]
+        for i, param_name in enumerate(param_names):
+            if i < len(parts):
+                result += f":{param_name}" + parts[i+1]
+                
+        print("\n=== 1단계: prepared_Param_DataType 매핑 결과 ===")
+        print(f"원본 쿼리: {query}")
+        print(f"매핑된 쿼리: {result}")
+        return result
+
+    def _get_record_mappings(self, activity, param_names: List[str]) -> Dict[str, str]:
+        """
+        2단계: Record 태그에서 실제 값 매핑 정보 추출
         
         Args:
             activity: JDBC 액티비티 XML 요소
             param_names: prepared_Param_DataType에서 추출한 파라미터 이름 목록
             
         Returns:
-            Dict[str, str]: 파라미터 이름과 매핑된 값의 딕셔너리
+            Dict[str, str]: 파라미터 이름과 매핑된 실제 값의 딕셔너리
         """
         mappings = {}
         input_bindings = activity.find('.//pd:inputBindings', self.ns)
         if input_bindings is None:
+            print("\n=== inputBindings 태그를 찾을 수 없음 ===")
             return mappings
 
+        print("\n=== Record 매핑 검색 시작 ===")
+        
         # jdbcUpdateActivityInput/Record 찾기
         jdbc_input = input_bindings.find('.//jdbcUpdateActivityInput')
         if jdbc_input is None:
+            print("jdbcUpdateActivityInput을 찾을 수 없음")
             return mappings
 
         # for-each/Record 찾기
         for_each = jdbc_input.find('.//xsl:for-each', self.ns)
         record = for_each.find('./Record') if for_each is not None else jdbc_input
-
+        
         if record is not None:
+            print("Record 태그 발견")
             # 각 파라미터 이름에 대해 매핑 찾기
             for param_name in param_names:
+                print(f"\n파라미터 '{param_name}' 매핑 검색:")
                 param_element = record.find(f'.//{param_name}')
                 if param_element is not None:
                     # value-of 체크
@@ -571,7 +608,9 @@ class BWQueryExtractor:
                         select_attr = value_of.get('select', '')
                         if select_attr:
                             # select="BANANA"와 같은 형식에서 실제 값 추출
-                            mappings[param_name] = select_attr.split('/')[-1]
+                            value = select_attr.split('/')[-1]
+                            mappings[param_name] = value
+                            print(f"value-of 매핑 발견: {param_name} -> {value}")
                     
                     # choose/when 체크
                     choose = param_element.find('.//xsl:choose', self.ns)
@@ -581,37 +620,35 @@ class BWQueryExtractor:
                             test_attr = when.get('test', '')
                             if 'exists(' in test_attr:
                                 # exists(BANANA)와 같은 형식에서 변수 이름 추출
-                                var_name = test_attr[test_attr.find('(')+1:test_attr.find(')')]
-                                mappings[param_name] = var_name
+                                value = test_attr[test_attr.find('(')+1:test_attr.find(')')]
+                                mappings[param_name] = value
+                                print(f"choose/when 매핑 발견: {param_name} -> {value}")
+                else:
+                    print(f"'{param_name}'에 대한 매핑을 찾을 수 없음")
 
         return mappings
 
-    def _replace_placeholders(self, query: str, param_names: List[str], mappings: Dict[str, str]) -> str:
+    def _replace_with_actual_values(self, query: str, mappings: Dict[str, str]) -> str:
         """
-        SQL 쿼리의 ? 플레이스홀더를 매핑된 파라미터 이름으로 대체
+        2단계: 파라미터 이름을 Record에서 찾은 실제 값으로 대체
         
         Args:
-            query (str): 원본 SQL 쿼리
-            param_names (List[str]): 파라미터 이름 목록
-            mappings (Dict[str, str]): 파라미터 매핑 정보
+            query (str): 1단계에서 파라미터 이름이 대체된 쿼리
+            mappings (Dict[str, str]): 파라미터 이름과 실제 값의 매핑
             
         Returns:
-            str: 파라미터가 대체된 SQL 쿼리
+            str: 실제 값이 대체된 SQL 쿼리
         """
-        parts = query.split('?')
-        if len(parts) == 1:  # 플레이스홀더가 없는 경우
-            return query
+        result = query
+        for param_name, actual_value in mappings.items():
+            result = result.replace(f":{param_name}", f":{actual_value}")
             
-        result = parts[0]
-        for i, param_name in enumerate(param_names):
-            if i < len(parts):
-                # 매핑된 값이 있으면 사용, 없으면 원래 파라미터 이름 사용
-                mapped_value = mappings.get(param_name, param_name)
-                result += f":{mapped_value}" + parts[i+1]
-            
+        print("\n=== 2단계: Record 매핑 결과 ===")
+        print(f"1단계 쿼리: {query}")
+        print(f"최종 쿼리: {result}")
         return result
 
-    def extract_recv_query(self, xml_path: str) -> List[Tuple[str, str]]:
+    def extract_recv_query(self, xml_path: str) -> List[Tuple[str, str, str]]:
         """
         수신용 XML에서 SQL 쿼리와 파라미터가 매핑된 쿼리를 추출
         
@@ -619,10 +656,11 @@ class BWQueryExtractor:
             xml_path (str): XML 파일 경로
             
         Returns:
-            List[Tuple[str, str]]: (원본 쿼리, 파라미터 매핑된 쿼리) 목록
+            List[Tuple[str, str, str]]: (원본 쿼리, 1단계 매핑 쿼리, 2단계 매핑 쿼리) 목록
         """
         queries = []
         try:
+            print(f"\n=== XML 파일 처리 시작: {xml_path} ===")
             tree = ET.parse(xml_path)
             root = tree.getroot()
             
@@ -635,23 +673,29 @@ class BWQueryExtractor:
                 if activity_type is None or 'jdbc' not in activity_type.text.lower():
                     continue
                     
+                print(f"\nJDBC 액티비티 발견: {activity.get('name', 'Unknown')}")
+                
                 # statement 추출
                 statement = activity.find('.//config/statement')
                 if statement is not None and statement.text:
                     query = statement.text.strip()
                     if query.lower().startswith('insert'):
-                        # 파라미터 이름 목록 추출
+                        print(f"\n원본 INSERT 쿼리 발견:\n{query}")
+                        
+                        # 1단계: prepared_Param_DataType의 파라미터 이름으로 매핑
                         param_names = self._get_parameter_names(activity)
-                        # 파라미터 매핑 추출
-                        mappings = self._get_parameter_mappings(activity, param_names)
-                        # 매핑된 쿼리 생성
-                        mapped_query = self._replace_placeholders(query, param_names, mappings)
-                        queries.append((query, mapped_query))
+                        stage1_query = self._replace_with_param_names(query, param_names)
+                        
+                        # 2단계: Record의 실제 값으로 매핑
+                        mappings = self._get_record_mappings(activity, param_names)
+                        stage2_query = self._replace_with_actual_values(stage1_query, mappings)
+                        
+                        queries.append((query, stage1_query, stage2_query))
             
         except ET.ParseError as e:
-            print(f"XML 파싱 오류: {e}")
+            print(f"\n=== XML 파싱 오류: {e} ===")
         except Exception as e:
-            print(f"쿼리 추출 중 오류 발생: {e}")
+            print(f"\n=== 쿼리 추출 중 오류 발생: {e} ===")
             
         return queries
 
@@ -696,7 +740,7 @@ class BWQueryExtractor:
         """
         return {
             'send': self.extract_send_query(xml_path),
-            'recv': [mapped_query for _, mapped_query in self.extract_recv_query(xml_path)]
+            'recv': [mapped_query for _, _, mapped_query in self.extract_recv_query(xml_path)]
         }
 
 class FileSearcher:
