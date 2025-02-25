@@ -506,6 +506,29 @@ class QueryParser:
         
         print("\n" + "=" * 50)
 
+    def _remove_oracle_hints(self, query: str) -> str:
+        """
+        SQL 쿼리에서 Oracle 힌트(/*+ ... */) 제거
+        
+        Args:
+            query (str): 원본 SQL 쿼리
+            
+        Returns:
+            str: 힌트가 제거된 SQL 쿼리
+        """
+        import re
+        # /*+ ... */ 패턴의 힌트 제거
+        cleaned_query = re.sub(r'/\*\+[^*]*\*/', '', query)
+        # 불필요한 공백 정리 (여러 개의 공백을 하나로)
+        cleaned_query = re.sub(r'\s+', ' ', cleaned_query).strip()
+        
+        if cleaned_query != query:
+            print("\n=== Oracle 힌트 제거 ===")
+            print(f"원본 쿼리: {query}")
+            print(f"정리된 쿼리: {cleaned_query}")
+            
+        return cleaned_query
+
 class BWQueryExtractor:
     """TIBCO BW XML 파일에서 특정 태그 구조에 따라 SQL 쿼리를 추출하는 클래스"""
     
@@ -694,8 +717,11 @@ class BWQueryExtractor:
                 statement = activity.find('.//config/statement')
                 if statement is not None and statement.text:
                     query = statement.text.strip()
-                    if query.lower().startswith('insert'):
-                        print(f"\n원본 INSERT 쿼리 발견:\n{query}")
+                    # Oracle 힌트 제거
+                    query = QueryParser()._remove_oracle_hints(query)
+                    
+                    if query.lower().startswith(('insert', 'select', 'update', 'delete')):
+                        print(f"\n쿼리 발견:\n{query}")
                         
                         # 1단계: prepared_Param_DataType의 파라미터 이름으로 매핑
                         param_names = self._get_parameter_names(activity)
