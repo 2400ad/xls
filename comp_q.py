@@ -117,10 +117,29 @@ class QueryParser:
             print("Failed to match columns and values pattern")
             return None
             
-        # 컬럼과 값 파싱
-        columns = {}
+        # 컬럼 파싱
         col_names = [c.strip() for c in cols_match.group(1).split(',')]
-        col_values = [v.strip() for v in cols_match.group(2).split(',')]
+        
+        # 값 파싱 - 함수 호출을 고려한 파싱
+        values_str = cols_match.group(2)
+        col_values = []
+        current_value = ""
+        paren_count = 0
+        
+        for char in values_str:
+            if char == ',' and paren_count == 0:
+                if current_value:
+                    col_values.append(current_value.strip())
+                    current_value = ""
+            else:
+                if char == '(':
+                    paren_count += 1
+                elif char == ')':
+                    paren_count -= 1
+                current_value += char
+        
+        if current_value:  # 마지막 값 추가
+            col_values.append(current_value.strip())
         
         print(f"Found columns: {col_names}")
         print(f"Found values: {col_values}")
@@ -135,6 +154,7 @@ class QueryParser:
             print("Found empty column names or values")
             return None
             
+        columns = {}
         for name, value in zip(col_names, col_values):
             columns[name] = value
             
