@@ -6,6 +6,7 @@ import xml.etree.ElementTree as ET
 from typing import Dict, List, Optional, Tuple
 import os
 import fnmatch
+import sys
 
 class XMLComparator:
     def __init__(self, excel_path: str, search_dir: str):
@@ -300,20 +301,83 @@ class XMLComparator:
         if self.mapper:
             self.mapper.close_connections()
 
-def main():
-    """
-    메인 실행 함수
-    """
-    excel_path = "input.xlsx"
-    search_dir = "."  # 현재 디렉토리에서 검색
-    
-    comparator = XMLComparator(excel_path, search_dir)
-    try:
-        results = comparator.process_all_interfaces()
+    BW_SEARCH_DIR = "D:/bw_processes"  # BW 프로세스 파일이 있는 디렉토리 경로
+
+    def find_bw_files(self) -> List[Dict[str, str]]:
+        """
+        엑셀의 인터페이스 정보에서 송신 테이블명을 추출하여 BW 파일을 검색합니다.
         
-    finally:
-        comparator.close()
+        Returns:
+            List[Dict[str, str]]: [
+                {
+                    'interface_name': str,
+                    'interface_id': str,
+                    'send_table': str,
+                    'bw_files': List[str]
+                },
+                ...
+            ]
+        """
+        results = []
+        file_searcher = FileSearcher()
+        
+        # 엑셀에서 인터페이스 정보 읽기
+        for row in range(2, self.worksheet.max_row + 1, 3):  # 3행씩 건너뛰며 읽기
+            interface_info = read_interface_block(self.worksheet, row)
+            if not interface_info:
+                continue
+                
+            # 송신 테이블명 추출 (스키마/오너 제외)
+            send_table = interface_info['send'].get('table_name')
+            if not send_table:
+                continue
+                
+            # BW 파일 검색
+            bw_files = file_searcher.find_files_with_keywords(BW_SEARCH_DIR, [send_table])
+            matching_files = bw_files.get(send_table, [])
+            
+            results.append({
+                'interface_name': interface_info['interface_name'],
+                'interface_id': interface_info['interface_id'],
+                'send_table': send_table,
+                'bw_files': matching_files
+            })
+            
+        return results
+        
+    def print_bw_search_results(self, results: List[Dict[str, str]]):
+        """
+        BW 파일 검색 결과를 출력합니다.
+        
+        Args:
+            results (List[Dict[str, str]]): find_bw_files()의 반환값
+        """
+        print("\nBW File Search Results:")
+        print("-" * 80)
+        print(f"{'Interface Name':<30} {'Interface ID':<15} {'Send Table':<20} {'BW Files'}")
+        print("-" * 80)
+        
+        for result in results:
+            bw_files_str = ', '.join(result['bw_files']) if result['bw_files'] else 'No matching files'
+            print(f"{result['interface_name']:<30} {result['interface_id']:<15} {result['send_table']:<20} {bw_files_str}")
+
+def main():
+    if len(sys.argv) != 3:
+        print("Usage: python comp_xml.py <excel_path> <xml_dir>")
+        sys.exit(1)
+
+    excel_path = sys.argv[1]
+    xml_dir = sys.argv[2]
+
+    comparator = XMLComparator(excel_path, xml_dir)
+    
+    # BW 파일 검색 및 결과 출력
+    print("\n[BW 파일 검색 시작]")
+    bw_results = comparator.find_bw_files()
+    comparator.print_bw_search_results(bw_results)
+    
+    print("\n[MQ XML 파일 검색 및 쿼리 비교 시작]")
+    comparator.process_all_interfaces()
 
 if __name__ == "__main__":
     main()
-dl
