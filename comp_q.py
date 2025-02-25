@@ -717,12 +717,21 @@ class BWQueryExtractor:
                 statement = activity.find('.//config/statement')
                 if statement is not None and statement.text:
                     query = statement.text.strip()
-                    # Oracle 힌트 제거
-                    query = self._remove_oracle_hints(query)
+                    print(f"\n발견된 쿼리:\n{query}")
                     
-                    if query.lower().startswith(('insert', 'select', 'update', 'delete')):
-                        print(f"\n쿼리 발견:\n{query}")
-                        
+                    # SELECT 쿼리인 경우
+                    if query.lower().startswith('select'):
+                        # FROM DUAL 쿼리 제외
+                        if not self._is_valid_query(query):
+                            print("=> FROM DUAL 쿼리이므로 제외")
+                            continue
+                        # Oracle 힌트 제거
+                        query = self._remove_oracle_hints(query)
+                        print(f"=> Oracle 힌트 제거 후 쿼리:\n{query}")
+                        queries.append((query, query, query))  # SELECT는 파라미터 매핑 없음
+                    
+                    # INSERT, UPDATE, DELETE 쿼리인 경우
+                    elif query.lower().startswith(('insert', 'update', 'delete')):
                         # 1단계: prepared_Param_DataType의 파라미터 이름으로 매핑
                         param_names = self._get_parameter_names(activity)
                         stage1_query = self._replace_with_param_names(query, param_names)
@@ -732,6 +741,9 @@ class BWQueryExtractor:
                         stage2_query = self._replace_with_actual_values(stage1_query, mappings)
                         
                         queries.append((query, stage1_query, stage2_query))
+                        print(f"=> 최종 처리된 쿼리:\n{stage2_query}")
+            
+            print(f"\n=== 처리된 유효한 쿼리 수: {len(queries)} ===")
             
         except ET.ParseError as e:
             print(f"\n=== XML 파싱 오류: {e} ===")
