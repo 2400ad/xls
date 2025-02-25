@@ -1,6 +1,6 @@
 import openpyxl
 from xltest import read_interface_block, process_interface
-from comp_q import QueryParser, QueryDifference, FileSearcher, BWParser
+from comp_q import QueryParser, QueryDifference, FileSearcher, BWQueryExtractor
 from maptest import ColumnMapper
 import xml.etree.ElementTree as ET
 from typing import Dict, List, Optional, Tuple
@@ -384,7 +384,7 @@ def main():
     # BW 파일에서 쿼리 추출
     print("\n[BW 파일 쿼리 추출]")
     print("-" * 80)
-    bw_parser = BWParser()
+    extractor = BWQueryExtractor()  # BWQueryExtractor 사용
     for result in bw_results:
         if result['bw_files']:  # BW 파일이 있는 경우에만 처리
             print(f"\n인터페이스: {result['interface_name']} ({result['interface_id']})")
@@ -393,7 +393,7 @@ def main():
             for bw_file in result['bw_files']:
                 bw_file_path = os.path.join(bw_dir, bw_file)
                 if os.path.exists(bw_file_path):
-                    query = bw_parser.get_single_query(bw_file_path)
+                    query = extractor.get_single_query(bw_file_path)  # BWQueryExtractor의 get_single_query 사용
                     if query:
                         print(f"\nBW 파일: {bw_file}")
                         print("-" * 40)
