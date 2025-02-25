@@ -7,6 +7,7 @@ from typing import Dict, List, Optional, Tuple
 import os
 import fnmatch
 import sys
+from xml_parse1 import BWQueryExtractor
 
 class XMLComparator:
     # 클래스 변수로 BW_SEARCH_DIR 정의
@@ -373,13 +374,33 @@ def main():
     
     comparator = XMLComparator(excel_path, xml_dir)
     
-    # BW 파일 검색 및 결과 출력
+    print("\n[MQ XML 파일 검색 및 쿼리 비교 시작]")
+    comparator.process_all_interfaces()
+    
+    # BW 파일 검색 및 결과 출력을 마지막으로 이동
     print("\n[BW 파일 검색 시작]")
     bw_results = comparator.find_bw_files()
     comparator.print_bw_search_results(bw_results)
     
-    print("\n[MQ XML 파일 검색 및 쿼리 비교 시작]")
-    comparator.process_all_interfaces()
+    # BW 파일에서 쿼리 추출
+    print("\n[BW 파일 쿼리 추출]")
+    print("-" * 80)
+    extractor = BWQueryExtractor()
+    for result in bw_results:
+        if result['bw_files']:  # BW 파일이 있는 경우에만 처리
+            print(f"\n인터페이스: {result['interface_name']} ({result['interface_id']})")
+            print(f"송신 테이블: {result['send_table']}")
+            print("찾은 BW 파일의 쿼리:")
+            for bw_file in result['bw_files']:
+                bw_file_path = os.path.join(bw_dir, bw_file)
+                if os.path.exists(bw_file_path):
+                    query = extractor.get_single_query(bw_file_path)
+                    if query:
+                        print(f"\nBW 파일: {bw_file}")
+                        print("-" * 40)
+                        print(query)
+                    else:
+                        print(f"\nBW 파일: {bw_file} - 쿼리를 찾을 수 없음")
 
 if __name__ == "__main__":
     main()
