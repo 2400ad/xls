@@ -741,8 +741,15 @@ class BWQueryExtractor:
         return queries
 
     def extract_send_query(self, xml_path: str) -> List[str]:
-        """송신용 XML에서 SQL 쿼리 추출 (변경 없음)"""
-        # 기존 코드 유지
+        """
+        송신용 XML에서 SQL 쿼리 추출
+        
+        Args:
+            xml_path (str): XML 파일 경로
+            
+        Returns:
+            List[str]: SQL 쿼리 목록
+        """
         queries = []
         try:
             tree = ET.parse(xml_path)
@@ -756,7 +763,9 @@ class BWQueryExtractor:
                 if statement is not None and statement.text:
                     query = statement.text.strip()
                     if query.lower().startswith('select'):
-                        queries.append(query)
+                        # Oracle 힌트 제거
+                        query = QueryParser()._remove_oracle_hints(query)
+                    queries.append(query)
             
         except ET.ParseError as e:
             print(f"XML 파싱 오류: {e}")
