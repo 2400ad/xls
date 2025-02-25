@@ -837,6 +837,36 @@ class BWQueryExtractor:
             'send': self.extract_send_query(xml_path),
             'recv': [mapped_query for _, _, mapped_query in self.extract_recv_query(xml_path)]
         }
+    def get_single_query(self, xml_path: str) -> str:
+        """
+        BW XML 파일에서 SQL 쿼리를 추출하여 단일 문자열로 반환
+        송신(send)과 수신(recv) 쿼리 중 존재하는 것을 반환
+        둘 다 없는 경우 빈 문자열 반환
+        
+        Args:
+            xml_path (str): XML 파일 경로
+            
+        Returns:
+            str: 추출된 SQL 쿼리 문자열. 쿼리가 없으면 빈 문자열
+        """
+        try:
+            # 기존 extract_bw_queries 메소드 활용
+            queries = self.extract_bw_queries(xml_path)
+            
+            # 송신 쿼리 확인
+            if queries.get('send') and len(queries['send']) > 0:
+                return queries['send'][0]  # 첫 번째 송신 쿼리 반환
+                
+            # 수신 쿼리 확인
+            if queries.get('recv') and len(queries['recv']) > 0:
+                return queries['recv'][0]  # 첫 번째 수신 쿼리 반환
+                
+            # 쿼리가 없는 경우
+            return ""
+            
+        except Exception as e:
+            print(f"쿼리 추출 중 오류 발생: {e}")
+            return ""  # 오류 발생 시 빈 문자열 반환        
 
 class FileSearcher:
     @staticmethod
