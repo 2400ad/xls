@@ -776,29 +776,28 @@ class BWQueryExtractor:
             tree = ET.parse(xml_path)
             root = tree.getroot()
             
-            # JDBC 액티비티 찾기
-            activities = root.findall('.//pd:activity', self.ns)
+            # 송신 쿼리 추출 (Group 내의 SelectP 활동)
+            select_activities = root.findall('.//pd:group[@name="Group"]//pd:activity[@name="SelectP"]', self.ns)
             
-            for activity in activities:
-                # JDBC 액티비티 타입 확인
-                activity_type = activity.find('./pd:type', self.ns)
-                if activity_type is None or 'jdbc' not in activity_type.text.lower():
-                    continue
-                    
-                # statement 추출
+            print(f"\n=== 송신용 XML 처리 시작: {xml_path} ===")
+            print(f"발견된 SelectP 활동 수: {len(select_activities)}")
+            
+            for activity in select_activities:
                 statement = activity.find('.//config/statement')
                 if statement is not None and statement.text:
                     query = statement.text.strip()
-                    if query.lower().startswith('select'):
-                        # 유효한 쿼리인지 확인
-                        if not self._is_valid_query(query):
-                            continue
-                            
-                        # Oracle 힌트 제거
-                        query = self._remove_oracle_hints(query)
-                        print(f"\n=== 유효한 SELECT 쿼리 발견 ===")
-                        print(f"쿼리: {query}")
-                        queries.append(query)
+                    print(f"\n원본 쿼리 발견:\n{query}")
+                    
+                    # 유효한 쿼리인지 확인
+                    if not self._is_valid_query(query):
+                        continue
+                        
+                    # Oracle 힌트 제거
+                    query = self._remove_oracle_hints(query)
+                    print(f"처리된 쿼리:\n{query}")
+                    queries.append(query)
+            
+            print(f"\n=== 처리된 총 쿼리 수: {len(queries)} ===")
             
         except ET.ParseError as e:
             print(f"XML 파싱 오류: {e}")
