@@ -518,7 +518,7 @@ class BWQueryExtractor:
 
     def _get_parameter_names(self, activity) -> List[str]:
         """
-        prepared_Param_DataType에서 파라미터 이름 목록 추출
+        Prepared_Param_DataType에서 파라미터 이름 목록 추출
         
         Args:
             activity: JDBC 액티비티 XML 요소
@@ -527,17 +527,32 @@ class BWQueryExtractor:
             List[str]: 파라미터 이름 목록
         """
         param_names = []
-        prepared_params = activity.find('.//prepared_Param_DataType')
+        print("\n=== XML 구조 디버깅 ===")
+        print("activity 태그:", activity.tag)
+        print("activity의 자식 태그들:", [child.tag for child in activity])
+        
+        # 대소문자를 맞춰서 수정
+        prepared_params = activity.find('.//Prepared_Param_DataType', self.ns)
         if prepared_params is not None:
-            print("\n=== prepared_Param_DataType 태그 발견 ===")
-            for param in prepared_params.findall('./parameter'):
-                param_name = param.find('./parameterName')
+            print("\n=== Prepared_Param_DataType 태그 발견 ===")
+            print("prepared_params 태그:", prepared_params.tag)
+            print("prepared_params의 자식 태그들:", [child.tag for child in prepared_params])
+            
+            for param in prepared_params.findall('./parameter', self.ns):
+                param_name = param.find('./parameterName', self.ns)
                 if param_name is not None and param_name.text:
                     name = param_name.text.strip()
                     param_names.append(name)
                     print(f"파라미터 이름 추출: {name}")
         else:
-            print("\n=== prepared_Param_DataType 태그를 찾을 수 없음 ===")
+            print("\n=== Prepared_Param_DataType 태그를 찾을 수 없음 ===")
+            # 전체 XML 구조를 재귀적으로 출력하여 디버깅
+            def print_element_tree(element, level=0):
+                print("  " * level + f"- {element.tag}")
+                for child in element:
+                    print_element_tree(child, level + 1)
+            print("\n=== 전체 XML 구조 ===")
+            print_element_tree(activity)
         
         return param_names
 
