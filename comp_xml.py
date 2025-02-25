@@ -362,14 +362,14 @@ class XMLComparator:
             print(f"{result['interface_name']:<30} {result['interface_id']:<15} {result['send_table']:<20} {bw_files_str}")
 
 def main():
-    if len(sys.argv) != 3:
-        print("Usage: python comp_xml.py <excel_path> <xml_dir>")
-        sys.exit(1)
-
-    excel_path = sys.argv[1]
-    xml_dir = sys.argv[2]
-    bw_dir = sys.argv[3]
-
+    # 고정된 경로 사용
+    excel_path = 'C:\\work\\LT\\input_LT.xlsx'
+    xml_dir = 'C:\\work\\LT\\xml'
+    bw_dir = 'C:\\work\\LT\\BW소스'  # BW 디렉토리 경로도 여기서 설정
+    
+    # BW 검색 디렉토리 설정
+    XMLComparator.BW_SEARCH_DIR = bw_dir
+    
     comparator = XMLComparator(excel_path, xml_dir)
     
     # BW 파일 검색 및 결과 출력
