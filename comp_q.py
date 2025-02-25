@@ -506,6 +506,16 @@ class QueryParser:
         
         print("\n" + "=" * 50)
 
+class BWQueryExtractor:
+    """TIBCO BW XML 파일에서 특정 태그 구조에 따라 SQL 쿼리를 추출하는 클래스"""
+    
+    def __init__(self):
+        self.ns = {
+            'pd': 'http://xmlns.tibco.com/bw/process/2003',
+            'xsl': 'http://www.w3.org/1999/XSL/Transform',
+            'xsi': 'http://www.w3.org/2001/XMLSchema-instance'
+        }
+
     def _remove_oracle_hints(self, query: str) -> str:
         """
         SQL 쿼리에서 Oracle 힌트(/*+ ... */) 제거
@@ -528,16 +538,6 @@ class QueryParser:
             print(f"정리된 쿼리: {cleaned_query}")
             
         return cleaned_query
-
-class BWQueryExtractor:
-    """TIBCO BW XML 파일에서 특정 태그 구조에 따라 SQL 쿼리를 추출하는 클래스"""
-    
-    def __init__(self):
-        self.ns = {
-            'pd': 'http://xmlns.tibco.com/bw/process/2003',
-            'xsl': 'http://www.w3.org/1999/XSL/Transform',
-            'xsi': 'http://www.w3.org/2001/XMLSchema-instance'
-        }
 
     def _get_parameter_names(self, activity) -> List[str]:
         """
@@ -718,7 +718,7 @@ class BWQueryExtractor:
                 if statement is not None and statement.text:
                     query = statement.text.strip()
                     # Oracle 힌트 제거
-                    query = QueryParser()._remove_oracle_hints(query)
+                    query = self._remove_oracle_hints(query)
                     
                     if query.lower().startswith(('insert', 'select', 'update', 'delete')):
                         print(f"\n쿼리 발견:\n{query}")
