@@ -1,7 +1,7 @@
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
-from xltest import process_interface
+from xltest import process_interface, read_interface_block
 from comp_q import QueryParser, QueryDifference, FileSearcher, BWQueryExtractor
 from maptest import ColumnMapper
 import xml.etree.ElementTree as ET
@@ -13,68 +13,35 @@ import datetime
 import ast
 
 def read_interface_block(ws, start_col):
-    """Excel에서 3컬럼 단위로 하나의 인터페이스 정보를 읽습니다."""
-    interface_info = {
-        'interface_name': ws.cell(row=1, column=start_col).value or '',  # IF NAME (1행)
-        'interface_id': ws.cell(row=2, column=start_col).value or '',    # IF ID (2행)
-        'send': {'owner': None, 'table_name': None, 'columns': []},
-        'recv': {'owner': None, 'table_name': None, 'columns': []}
-    }
-    
-    # 인터페이스 ID가 없으면 빈 인터페이스로 간주
-    if not interface_info['interface_id']:
-        return None
-    
+    """Excel에서 3컬럼 단위로 하나의 인터페이스 정보를 읽습니다.
+    이 함수는 xltest.py의 동일한 함수를 대체하지 않고, 가져오지 못한 경우의 백업 역할만 합니다.
+    """
     try:
-        # DB 정보 (3행, 문자열 형식으로 저장된 dict)
-        send_db_cell = ws.cell(row=3, column=start_col).value
-        recv_db_cell = ws.cell(row=3, column=start_col + 1).value
+        interface_info = {
+            'interface_name': ws.cell(row=1, column=start_col).value or '',  # IF NAME (1행)
+            'interface_id': ws.cell(row=2, column=start_col).value or '',    # IF ID (2행)
+            'send': {'owner': None, 'table_name': None, 'columns': [], 'db_info': None},
+            'recv': {'owner': None, 'table_name': None, 'columns': [], 'db_info': None}
+        }
         
-        if send_db_cell:
-            try:
-                send_db_info = ast.literal_eval(send_db_cell)
-                interface_info['send_system'] = send_db_info.get('system', 'N/A')
-            except:
-                print(f"Warning: Cannot parse send DB info: {send_db_cell}")
-                interface_info['send_system'] = 'N/A'
-        else:
-            interface_info['send_system'] = 'N/A'
+        # 인터페이스 ID가 없으면 빈 인터페이스로 간주
+        if not interface_info['interface_id']:
+            return None
             
-        if recv_db_cell:
-            try:
-                recv_db_info = ast.literal_eval(recv_db_cell)
-                interface_info['recv_system'] = recv_db_info.get('system', 'N/A')
-            except:
-                print(f"Warning: Cannot parse recv DB info: {recv_db_cell}")
-                interface_info['recv_system'] = 'N/A'
-        else:
-            interface_info['recv_system'] = 'N/A'
+        # DB 연결 정보 (3행에서 읽기)
+        send_db_info = ast.literal_eval(ws.cell(row=3, column=start_col).value)
+        recv_db_info = ast.literal_eval(ws.cell(row=3, column=start_col + 1).value)
+        interface_info['send']['db_info'] = send_db_info
+        interface_info['recv']['db_info'] = recv_db_info
         
-        # 테이블 정보 (4행, 문자열 형식으로 저장된 dict)
-        send_table_cell = ws.cell(row=4, column=start_col).value
-        recv_table_cell = ws.cell(row=4, column=start_col + 1).value
+        # 테이블 정보 (4행에서 읽기)
+        send_table_info = ast.literal_eval(ws.cell(row=4, column=start_col).value)
+        recv_table_info = ast.literal_eval(ws.cell(row=4, column=start_col + 1).value)
         
-        if send_table_cell:
-            try:
-                send_table_info = ast.literal_eval(send_table_cell)
-                interface_info['send']['owner'] = send_table_info.get('owner', '')
-                interface_info['send']['table_name'] = send_table_info.get('table_name', '')
-                interface_info['send_table'] = send_table_info.get('table_name', '')
-            except:
-                print(f"Warning: Cannot parse send table info: {send_table_cell}")
-        else:
-            print(f"Warning: No send table info for interface {interface_info['interface_id']}")
-            
-        if recv_table_cell:
-            try:
-                recv_table_info = ast.literal_eval(recv_table_cell)
-                interface_info['recv']['owner'] = recv_table_info.get('owner', '')
-                interface_info['recv']['table_name'] = recv_table_info.get('table_name', '')
-                interface_info['recv_table'] = recv_table_info.get('table_name', '')
-            except:
-                print(f"Warning: Cannot parse recv table info: {recv_table_cell}")
-        else:
-            print(f"Warning: No recv table info for interface {interface_info['interface_id']}")
+        interface_info['send']['owner'] = send_table_info.get('owner')
+        interface_info['send']['table_name'] = send_table_info.get('table_name')
+        interface_info['recv']['owner'] = recv_table_info.get('owner')
+        interface_info['recv']['table_name'] = recv_table_info.get('table_name')
         
         # 컬럼 매핑 정보 (5행부터)
         row = 5
@@ -85,22 +52,13 @@ def read_interface_block(ws, start_col):
             if not send_col and not recv_col:
                 break
                 
-            if send_col is not None:
-                interface_info['send']['columns'].append(str(send_col))
-            else:
-                interface_info['send']['columns'].append('')
-                
-            if recv_col is not None:
-                interface_info['recv']['columns'].append(str(recv_col))
-            else:
-                interface_info['recv']['columns'].append('')
-                
+            interface_info['send']['columns'].append(send_col if send_col else '')
+            interface_info['recv']['columns'].append(recv_col if recv_col else '')
             row += 1
             
     except Exception as e:
-        print(f"Error reading interface block at column {start_col}: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f'인터페이스 정보 읽기 중 오류 발생: {str(e)}')
+        return None
     
     return interface_info
 
@@ -491,20 +449,20 @@ class XMLComparator:
     
     def create_interface_sheet(self, index, interface_info, file_results, query_comparisons, bw_queries=None):
         """
-        인터페이스별 시트 생성 및 내용 작성
+        엑셀 파일에 각 인터페이스별 시트를 생성하고, 인터페이스 정보 및 쿼리 비교 결과를 기록
         
         Args:
-            index (int): 인터페이스 일련번호
+            index (int): 인터페이스 순번
             interface_info (dict): 인터페이스 정보
-            file_results (dict): XML 파일에서 추출한 쿼리 결과
+            file_results (dict): 파일 검색 결과
             query_comparisons (dict): 쿼리 비교 결과
             bw_queries (dict, optional): BW 쿼리 정보
         """
         if not bw_queries:
             bw_queries = {'send': '', 'recv': ''}
         
-        # 시트 이름 생성 (일련번호_인터페이스명)
-        sheet_name = f"{index}_{interface_info['interface_id']}"
+        # 시트 이름 생성 (일련번호_인터페이스ID)
+        sheet_name = f"{index:02d}_{interface_info['interface_id']}"
         if len(sheet_name) > 31:  # Excel 시트명 최대 길이 제한
             sheet_name = sheet_name[:31]
         
@@ -513,6 +471,7 @@ class XMLComparator:
         
         # 스타일 정의
         header_fill = PatternFill(start_color="CCCCFF", end_color="CCCCFF", fill_type="solid")
+        subheader_fill = PatternFill(start_color="EEEEEE", end_color="EEEEEE", fill_type="solid")
         border = Border(
             left=Side(style='thin'),
             right=Side(style='thin'),
@@ -588,7 +547,7 @@ class XMLComparator:
             cell.font = Font(bold=True)
             cell.alignment = align_center
             cell.border = border
-            cell.fill = PatternFill(start_color="EEEEEE", end_color="EEEEEE", fill_type="solid")
+            cell.fill = subheader_fill
         
         sheet.column_dimensions[get_column_letter(1)].width = 10
         sheet.column_dimensions[get_column_letter(2)].width = 50
@@ -672,7 +631,7 @@ class XMLComparator:
             cell.font = Font(bold=True)
             cell.alignment = align_center
             cell.border = border
-            cell.fill = PatternFill(start_color="EEEEEE", end_color="EEEEEE", fill_type="solid")
+            cell.fill = subheader_fill
         
         # MQ 수신 쿼리
         row += 1
@@ -752,20 +711,29 @@ class XMLComparator:
             if not interface_info:
                 print(f"Warning: Failed to read interface block at column {start_col}")
                 return None
-            
-            # 표준 필드 이름으로 정보 통합
+                
+            # 표준 필드 생성
+            # DB 정보에서 시스템 정보 추출
+            if 'send' in interface_info and 'db_info' in interface_info['send'] and interface_info['send']['db_info']:
+                interface_info['send_system'] = interface_info['send']['db_info'].get('system', 'N/A')
+            else:
+                interface_info['send_system'] = 'N/A'
+                
+            if 'recv' in interface_info and 'db_info' in interface_info['recv'] and interface_info['recv']['db_info']:
+                interface_info['recv_system'] = interface_info['recv']['db_info'].get('system', 'N/A')
+            else:
+                interface_info['recv_system'] = 'N/A'
+                
+            # 테이블 정보 추출
             if 'send' in interface_info and 'table_name' in interface_info['send']:
                 interface_info['send_table'] = interface_info['send']['table_name']
-            
+            else:
+                interface_info['send_table'] = ''
+                
             if 'recv' in interface_info and 'table_name' in interface_info['recv']:
                 interface_info['recv_table'] = interface_info['recv']['table_name']
-                
-            # 송수신 시스템 정보가 없을 경우 빈 값 설정
-            if 'send_system' not in interface_info:
-                interface_info['send_system'] = 'N/A'
-            
-            if 'recv_system' not in interface_info:
-                interface_info['recv_system'] = 'N/A'
+            else:
+                interface_info['recv_table'] = ''
                 
             # Excel에서 추출된 쿼리와 XML 얻기
             excel_results = process_interface(interface_info, self.mapper)
@@ -781,9 +749,6 @@ class XMLComparator:
             
             # BW 파일 찾기
             send_table = interface_info.get('send_table', '')
-            if not send_table and 'send' in interface_info and 'table_name' in interface_info['send']:
-                send_table = interface_info['send']['table_name']
-                
             if not send_table:
                 print(f"Warning: No send table information for IF_ID: {interface_info['interface_id']}")
                 bw_files = []
@@ -891,20 +856,32 @@ class XMLComparator:
         interface_count = 0
         processed_count = 0
         
-        # 열 위치 출력 (디버깅용)
-        print("엑셀 파일: " + self.excel_path)
-        print("열 구조 확인:")
-        for col in range(1, 10):
-            cell_value = self.worksheet.cell(row=2, column=col).value
-            print(f"열 {col}, 행 2: {cell_value}")
+        # 3열부터 시작 (인터페이스는 3열 간격으로 배치됨)
+        col = 3
         
-        col = 3  # 인터페이스는 3열부터 시작
+        # 인터페이스 블록 수 확인 (디버깅용)
+        while True:
+            if not self.worksheet.cell(row=2, column=col).value:
+                break
+            interface_count += 1
+            col += 3
+            
+        if interface_count == 0:
+            print("엑셀 파일에서 인터페이스 정보를 찾을 수 없습니다.")
+            return
+            
+        print(f"엑셀 파일에서 총 {interface_count}개의 인터페이스를 찾았습니다.")
+        print("-" * 80)
+        
+        # 실제 처리 시작
+        interface_count = 0
+        col = 3
+        
         while True:
             # 인터페이스 ID 셀 확인
             if_id_cell = self.worksheet.cell(row=2, column=col)
             if not if_id_cell.value:
                 # 더 이상 인터페이스가 없으면 종료
-                print(f"열 {col}에서 인터페이스 ID를 찾을 수 없습니다. 처리 종료.")
                 break
             
             interface_count += 1
@@ -923,19 +900,8 @@ class XMLComparator:
                 print(f"인터페이스 명: {interface_info['interface_name']}")
                 print(f"송신 시스템: {interface_info.get('send_system', 'N/A')}")
                 print(f"수신 시스템: {interface_info.get('recv_system', 'N/A')}")
-                if 'send_table' in interface_info:
-                    print(f"송신 테이블: {interface_info['send_table']}")
-                elif 'send' in interface_info and 'table_name' in interface_info['send']:
-                    print(f"송신 테이블: {interface_info['send']['table_name']}")
-                else:
-                    print("송신 테이블: 정보 없음")
-                    
-                if 'recv_table' in interface_info:
-                    print(f"수신 테이블: {interface_info['recv_table']}")
-                elif 'recv' in interface_info and 'table_name' in interface_info['recv']:
-                    print(f"수신 테이블: {interface_info['recv']['table_name']}")
-                else:
-                    print("수신 테이블: 정보 없음")
+                print(f"송신 테이블: {interface_info.get('send_table', 'N/A')}")
+                print(f"수신 테이블: {interface_info.get('recv_table', 'N/A')}")
                 
                 # BW 파일 정보 출력
                 if result['bw_files']:
@@ -1006,56 +972,57 @@ class XMLComparator:
         # 엑셀 파일 저장
         if processed_count > 0:
             self.save_excel_output()
+            print(f"\n엑셀 파일이 저장되었습니다: {self.output_path}")
         else:
             print("\n처리된 인터페이스가 없어 엑셀 파일을 생성하지 않았습니다.")
-
-def main():
-    # 고정된 경로 사용
-    excel_path = 'C:\\work\\LT\\input_LT.xlsx' # 인터페이스 정보
-    xml_dir = 'C:\\work\\LT\\xml' # MQ XML 파일 디렉토리
-    bw_dir = 'C:\\work\\LT\\BW소스'  # BW XML 파일 디렉토리 경로
-    
-    # BW 검색 디렉토리 설정
-    XMLComparator.BW_SEARCH_DIR = bw_dir
-    
-    comparator = XMLComparator(excel_path, xml_dir)
-    
-    # 명령행 인자가 있을 경우 처리
-    if len(sys.argv) > 1:
-        if sys.argv[1] == "excel":
-            # 엑셀 출력 모드 실행
-            print("\n[MQ XML과 BW XML 쿼리 비교 - 엑셀 출력 모드]")
-            comparator.process_all_interfaces_with_bw()
-            return
+{{ ... }}
+    def main():
+        # 고정된 경로 사용
+        excel_path = 'C:\\work\\LT\\input_LT.xlsx' # 인터페이스 정보
+        xml_dir = 'C:\\work\\LT\\xml' # MQ XML 파일 디렉토리
+        bw_dir = 'C:\\work\\LT\\BW소스'  # BW XML 파일 디렉토리 경로
         
-    # 기본 모드 실행 - 기존 로직 유지
-    print("\n[MQ XML 파일 검색 및 쿼리 비교 시작]")
-    comparator.process_all_interfaces()
-    
-    # BW 파일 검색 및 결과 출력을 마지막으로 이동
-    print("\n[BW 파일 검색 시작]")
-    bw_results = comparator.find_bw_files()
-    comparator.print_bw_search_results(bw_results)
-    
-    # BW 파일에서 쿼리 추출
-    print("\n[BW 파일 쿼리 추출]")
-    print("-" * 80)
-    extractor = BWQueryExtractor()  # BWQueryExtractor 사용
-    for result in bw_results:
-        if result['bw_files']:  # BW 파일이 있는 경우에만 처리
-            print(f"\n인터페이스: {result['interface_name']} ({result['interface_id']})")
-            print(f"송신 테이블: {result['send_table']}")
-            print("찾은 BW 파일의 쿼리:")
-            for bw_file in result['bw_files']:
-                bw_file_path = os.path.join(bw_dir, bw_file)
-                if os.path.exists(bw_file_path):
-                    query = extractor.get_single_query(bw_file_path)  # BWQueryExtractor의 get_single_query 사용
-                    if query:
-                        print(f"\nBW 파일: {bw_file}")
-                        print("-" * 40)
-                        print(query)
-                    else:
-                        print(f"\nBW 파일: {bw_file} - 쿼리를 찾을 수 없음")
+        # BW 검색 디렉토리 설정
+        XMLComparator.BW_SEARCH_DIR = bw_dir
+        
+        comparator = XMLComparator(excel_path, xml_dir)
+        
+        # 명령행 인자가 있을 경우 처리
+        if len(sys.argv) > 1:
+            if sys.argv[1] == "excel":
+                # 엑셀 출력 모드 실행
+                print("\n[MQ XML과 BW XML 쿼리 비교 - 엑셀 출력 모드]")
+                comparator.process_all_interfaces_with_bw()
+                return
+        
+        # 기본 모드 실행 - 기존 로직 유지
+        print("\n[MQ XML 파일 검색 및 쿼리 비교 시작]")
+        comparator.process_all_interfaces()
+        
+        # BW 파일 검색 및 결과 출력을 마지막으로 이동
+        print("\n[BW 파일 검색 시작]")
+        bw_results = comparator.find_bw_files()
+        comparator.print_bw_search_results(bw_results)
+        
+        # BW 파일에서 쿼리 추출
+        print("\n[BW 파일 쿼리 추출]")
+        print("-" * 80)
+        extractor = BWQueryExtractor()  # BWQueryExtractor 사용
+        for result in bw_results:
+            if result['bw_files']:  # BW 파일이 있는 경우에만 처리
+                print(f"\n인터페이스: {result['interface_name']} ({result['interface_id']})")
+                print(f"송신 테이블: {result['send_table']}")
+                print("찾은 BW 파일의 쿼리:")
+                for bw_file in result['bw_files']:
+                    bw_file_path = os.path.join(bw_dir, bw_file)
+                    if os.path.exists(bw_file_path):
+                        query = extractor.get_single_query(bw_file_path)  # BWQueryExtractor의 get_single_query 사용
+                        if query:
+                            print(f"\nBW 파일: {bw_file}")
+                            print("-" * 40)
+                            print(query)
+                        else:
+                            print(f"\nBW 파일: {bw_file} - 쿼리를 찾을 수 없음")
 
     print("\n[처리 완료]")
     print("엑셀 출력 모드로 실행하려면 'python comp_xml.py excel' 명령을 사용하세요.")
