@@ -1057,8 +1057,15 @@ class XMLComparator:
         cell.border = border
         cell.alignment = align_left
         
-        # 8. BW 수신 파일
-        bw_recv_file = bw_files[0] if bw_files else "매핑파일없음"
+        # 8. BW 수신 파일 - 수신용 BW 파일 또는 "매핑파일없음" 표시
+        # BW 파일이 없거나 송신용 파일만 있는 경우
+        bw_recv_file = "매핑파일없음"
+        
+        # BW 파일명에 "수신"이 포함된 파일이 있는지 확인
+        recv_bw_files = [f for f in bw_files if "수신" in f or "RECV" in f.upper() or "RCV" in f.upper()]
+        if recv_bw_files:
+            bw_recv_file = recv_bw_files[0]
+        
         cell = summary_sheet.cell(row=row, column=8, value=bw_recv_file)
         cell.border = border
         cell.alignment = align_left
