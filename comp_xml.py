@@ -755,10 +755,13 @@ class XMLComparator:
             else:
                 # 송신 테이블로 BW 파일 검색
                 bw_searcher = FileSearcher()
-                bw_files = bw_searcher.find_files_with_keyword(
+                bw_files = bw_searcher.find_files_with_keywords(
                     self.BW_SEARCH_DIR, 
-                    send_table
+                    [send_table]
                 )
+            
+            # bw_files가 사전 형태이므로 send_table 키워드에 대한 결과를 가져옴
+            matching_files = bw_files.get(send_table, [])
             
             # BW 쿼리 추출
             bw_queries = {
@@ -766,7 +769,7 @@ class XMLComparator:
                 'recv': ''
             }
             extractor = BWQueryExtractor()
-            for bw_file in bw_files:
+            for bw_file in matching_files:
                 bw_file_path = os.path.join(self.BW_SEARCH_DIR, bw_file)
                 if os.path.exists(bw_file_path):
                     queries = extractor.extract_bw_queries(bw_file_path)
@@ -833,7 +836,7 @@ class XMLComparator:
                 'bw_queries': bw_queries,
                 'comparisons': comparisons,
                 'warnings': warnings,
-                'bw_files': bw_files
+                'bw_files': matching_files
             }
             
         except Exception as e:
