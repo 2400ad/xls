@@ -428,7 +428,48 @@ class XMLComparator:
         if 'Sheet' in self.output_wb.sheetnames:
             sheet = self.output_wb['Sheet']
             sheet.title = '요약'
+            
+            # 요약 시트 헤더 초기화
+            self._initialize_summary_sheet(sheet)
     
+    def _initialize_summary_sheet(self, sheet):
+        """
+        요약 시트의 헤더를 초기화합니다.
+        
+        Args:
+            sheet: 요약 시트 객체
+        """
+        # 스타일 정의
+        header_fill = PatternFill(start_color="CCCCFF", end_color="CCCCFF", fill_type="solid")
+        border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+        align_center = Alignment(horizontal='center', vertical='center', wrap_text=True)
+        
+        # 열 너비 설정
+        sheet.column_dimensions['A'].width = 15  # 인터페이스 ID
+        sheet.column_dimensions['B'].width = 30  # 인터페이스 명
+        sheet.column_dimensions['C'].width = 30  # MQ 송신 파일
+        sheet.column_dimensions['D'].width = 30  # BW 송신 파일
+        sheet.column_dimensions['E'].width = 15  # 송신 비교 결과
+        sheet.column_dimensions['F'].width = 30  # MQ 수신 파일
+        sheet.column_dimensions['G'].width = 30  # BW 수신 파일
+        sheet.column_dimensions['H'].width = 15  # 수신 비교 결과
+        
+        # 헤더 행 생성
+        headers = ["인터페이스 ID", "인터페이스 명", "MQ 송신 파일", "BW 송신 파일", "송신 비교 결과", 
+                  "MQ 수신 파일", "BW 수신 파일", "수신 비교 결과"]
+        
+        for col_idx, header in enumerate(headers, 1):
+            cell = sheet.cell(row=1, column=col_idx, value=header)
+            cell.font = Font(bold=True)
+            cell.fill = header_fill
+            cell.alignment = align_center
+            cell.border = border
+
     def save_excel_output(self, output_path='C:\\work\\LT\\comp_mq_bw.xlsx'):
         """
         처리된 결과를 엑셀 파일로 저장
@@ -635,8 +676,8 @@ class XMLComparator:
                 diff_text.append("※ 차이점 있음")
                 for difference in diff.differences:
                     diff_text.append(f"- 컬럼: {difference['column']}")
-                    diff_text.append(f"  - MQ: {difference['query1_value']}")
-                    diff_text.append(f"  - BW: {difference['query2_value']}")
+                    diff_text.append(f"  - Excel: {difference['query1_value']}")
+                    diff_text.append(f"  - 파일: {difference['query2_value']}")
             else:
                 diff_text.append("※ 차이점 없음")
         
@@ -828,6 +869,7 @@ class XMLComparator:
         # 실제 처리 시작
         interface_count = 0
         col = 2
+        summary_row = 2  # 요약 시트의 시작 행(헤더 다음)
         
         while True:
             # 인터페이스 ID 셀 확인
@@ -902,6 +944,10 @@ class XMLComparator:
                     result['bw_queries']
                 )
                 
+                # 요약 시트에 결과 추가
+                self.update_summary_sheet(result, summary_row)
+                summary_row += 1
+                
                 # 결과를 리스트에 추가
                 self.interface_results.append(result)
                 
@@ -922,6 +968,110 @@ class XMLComparator:
         else:
             print("\n처리된 인터페이스가 없어 엑셀 파일을 생성하지 않았습니다.")
 
+    def update_summary_sheet(self, result, row):
+        """
+        요약 시트에 결과를 추가합니다.
+        
+        Args:
+            result (dict): 인터페이스 처리 결과
+            row (int): 요약 시트의 행 번호
+        """
+        # 요약 시트 가져오기
+        summary_sheet = self.output_wb['요약']
+        
+        # 스타일 정의
+        border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+        align_center = Alignment(horizontal='center', vertical='center', wrap_text=True)
+        align_left = Alignment(horizontal='left', vertical='center', wrap_text=True)
+        
+        # 인터페이스 정보 가져오기
+        interface_info = result['interface_info']
+        if_id = interface_info.get('interface_id', '')
+        if_name = interface_info.get('interface_name', '')
+        
+        # 파일 결과 가져오기
+        file_results = result['file_results']
+        
+        # BW 파일 정보 가져오기
+        bw_files = result.get('bw_files', [])
+        
+        # 송신 쿼리 비교 결과 가져오기
+        send_comparison = result['comparisons']['send']
+        
+        # 수신 쿼리 비교 결과 가져오기
+        recv_comparison = result['comparisons']['recv']
+        
+        # 1. 인터페이스 ID
+        cell = summary_sheet.cell(row=row, column=1, value=if_id)
+        cell.border = border
+        cell.alignment = align_center
+        
+        # 2. 인터페이스 명
+        cell = summary_sheet.cell(row=row, column=2, value=if_name)
+        cell.border = border
+        cell.alignment = align_left
+        
+        # 3. MQ 송신 파일
+        mq_send_file = os.path.basename(file_results['send']['path']) if file_results['send']['path'] else "매핑파일없음"
+        cell = summary_sheet.cell(row=row, column=3, value=mq_send_file)
+        cell.border = border
+        cell.alignment = align_left
+        
+        # 4. BW 송신 파일
+        bw_send_file = bw_files[0] if bw_files else "매핑파일없음"
+        cell = summary_sheet.cell(row=row, column=4, value=bw_send_file)
+        cell.border = border
+        cell.alignment = align_left
+        
+        # 5. 송신 비교 결과
+        send_result = "일치" if send_comparison and send_comparison.is_equal else "차이"
+        if not send_comparison or not file_results['send']['query'] or not result['bw_queries']['send']:
+            send_result = "비교불가"
+        cell = summary_sheet.cell(row=row, column=5, value=send_result)
+        cell.border = border
+        cell.alignment = align_center
+        
+        # 셀 색상 설정 (일치:초록, 차이:빨강, 비교불가:회색)
+        if send_result == "일치":
+            cell.fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
+        elif send_result == "차이":
+            cell.fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+        else:
+            cell.fill = PatternFill(start_color="DDDDDD", end_color="DDDDDD", fill_type="solid")
+        
+        # 6. MQ 수신 파일
+        mq_recv_file = os.path.basename(file_results['recv']['path']) if file_results['recv']['path'] else "매핑파일없음"
+        cell = summary_sheet.cell(row=row, column=6, value=mq_recv_file)
+        cell.border = border
+        cell.alignment = align_left
+        
+        # 7. BW 수신 파일
+        bw_recv_file = bw_files[0] if bw_files else "매핑파일없음"
+        cell = summary_sheet.cell(row=row, column=7, value=bw_recv_file)
+        cell.border = border
+        cell.alignment = align_left
+        
+        # 8. 수신 비교 결과
+        recv_result = "일치" if recv_comparison and recv_comparison.is_equal else "차이"
+        if not recv_comparison or not file_results['recv']['query'] or not result['bw_queries']['recv']:
+            recv_result = "비교불가"
+        cell = summary_sheet.cell(row=row, column=8, value=recv_result)
+        cell.border = border
+        cell.alignment = align_center
+        
+        # 셀 색상 설정 (일치:초록, 차이:빨강, 비교불가:회색)
+        if recv_result == "일치":
+            cell.fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
+        elif recv_result == "차이":
+            cell.fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+        else:
+            cell.fill = PatternFill(start_color="DDDDDD", end_color="DDDDDD", fill_type="solid")
+
 def main():
     # 고정된 경로 사용
     excel_path = 'C:\\work\\LT\\input_LT.xlsx' # 인터페이스 정보
@@ -940,7 +1090,7 @@ def main():
             print("\n[MQ XML과 BW XML 쿼리 비교 - 엑셀 출력 모드]")
             comparator.process_all_interfaces_with_bw()
             return
-    
+        
     # 기본 모드 실행 - 기존 로직 유지
     print("\n[MQ XML 파일 검색 및 쿼리 비교 시작]")
     comparator.process_all_interfaces()
