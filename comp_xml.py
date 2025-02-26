@@ -82,7 +82,8 @@ class XMLComparator:
         self.query_parser = QueryParser()
         self.output_wb = None  # 결과를 저장할 엑셀 워크북
         self.interface_results = []  # 모든 인터페이스 처리 결과 저장
-        
+        self.output_path = 'C:\\work\\LT\\comp_mq_bw.xlsx'  # 기본 출력 경로
+
     def extract_from_xml(self, xml_path: str) -> Tuple[str, str]:
         """
         XML 파일에서 쿼리와 XML 내용을 추출합니다.
@@ -435,6 +436,9 @@ class XMLComparator:
         Args:
             output_path (str): 출력 엑셀 파일 경로
         """
+        # output_path 값을 인스턴스 변수에 저장
+        self.output_path = output_path
+        
         if not self.output_wb:
             print("결과를 저장할 워크북이 초기화되지 않았습니다.")
             return False
