@@ -1034,10 +1034,8 @@ class XMLComparator:
         
         # 5. BW 송신 파일 - SELECT 쿼리가 있는 파일이 송신 파일
         bw_send_file = "매핑파일없음"
-        if bw_queries['send']:
-            # 송신 쿼리가 있으면 첫 번째 BW 파일을 표시
-            if bw_files:
-                bw_send_file = bw_files[0]
+        if bw_files and result['bw_queries']['send']:
+            bw_send_file = bw_files[0]
         
         cell = summary_sheet.cell(row=row, column=5, value=bw_send_file)
         cell.border = border
@@ -1065,12 +1063,10 @@ class XMLComparator:
         cell.border = border
         cell.alignment = align_left
         
-        # 8. BW 수신 파일 - INSERT 쿼리가 있는 경우 해당 파일 표시
+        # 8. BW 수신 파일
         bw_recv_file = "매핑파일없음"
-        if bw_queries['recv']:
-            # 수신 쿼리가 있으면 파일 표시 (첫 번째 파일과 동일할 수 있음)
-            if bw_files:
-                bw_recv_file = bw_files[0]
+        if bw_files and result['bw_queries']['recv']:
+            bw_recv_file = bw_files[0]
         
         cell = summary_sheet.cell(row=row, column=8, value=bw_recv_file)
         cell.border = border
