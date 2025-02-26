@@ -624,7 +624,7 @@ class XMLComparator:
                 for difference in diff.differences:
                     diff_text.append(f"- 컬럼: {difference['column']}")
                     diff_text.append(f"  - MQ: {difference['query1_value']}")
-                    diff_text.append(f"  - BW: {difference['query2_value']}")
+                    diff_text.append(f"  - 파일: {difference['query2_value']}")
             else:
                 diff_text.append("※ 차이점 없음")
         
@@ -1001,6 +1001,9 @@ class XMLComparator:
         # BW 파일 정보 가져오기
         bw_files = result.get('bw_files', [])
         
+        # BW 쿼리 가져오기
+        bw_queries = result.get('bw_queries', {'send': '', 'recv': ''})
+        
         # 송신 쿼리 비교 결과 가져오기
         send_comparison = result['comparisons']['send']
         
@@ -1029,8 +1032,13 @@ class XMLComparator:
         cell.border = border
         cell.alignment = align_left
         
-        # 5. BW 송신 파일
-        bw_send_file = bw_files[0] if bw_files else "매핑파일없음"
+        # 5. BW 송신 파일 - SELECT 쿼리가 있는 파일이 송신 파일
+        bw_send_file = "매핑파일없음"
+        if bw_queries['send']:
+            # 송신 쿼리가 있으면 첫 번째 BW 파일을 표시
+            if bw_files:
+                bw_send_file = bw_files[0]
+        
         cell = summary_sheet.cell(row=row, column=5, value=bw_send_file)
         cell.border = border
         cell.alignment = align_left
@@ -1057,14 +1065,12 @@ class XMLComparator:
         cell.border = border
         cell.alignment = align_left
         
-        # 8. BW 수신 파일 - 수신용 BW 파일 또는 "매핑파일없음" 표시
-        # BW 파일이 없거나 송신용 파일만 있는 경우
+        # 8. BW 수신 파일 - INSERT 쿼리가 있는 경우 해당 파일 표시
         bw_recv_file = "매핑파일없음"
-        
-        # BW 파일명에 "수신"이 포함된 파일이 있는지 확인
-        recv_bw_files = [f for f in bw_files if "수신" in f or "RECV" in f.upper() or "RCV" in f.upper()]
-        if recv_bw_files:
-            bw_recv_file = recv_bw_files[0]
+        if bw_queries['recv']:
+            # 수신 쿼리가 있으면 파일 표시 (첫 번째 파일과 동일할 수 있음)
+            if bw_files:
+                bw_recv_file = bw_files[0]
         
         cell = summary_sheet.cell(row=row, column=8, value=bw_recv_file)
         cell.border = border
