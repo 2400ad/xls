@@ -452,15 +452,16 @@ class XMLComparator:
         # 열 너비 설정
         sheet.column_dimensions['A'].width = 15  # 인터페이스 ID
         sheet.column_dimensions['B'].width = 30  # 인터페이스 명
-        sheet.column_dimensions['C'].width = 30  # MQ 송신 파일
-        sheet.column_dimensions['D'].width = 30  # BW 송신 파일
-        sheet.column_dimensions['E'].width = 15  # 송신 비교 결과
-        sheet.column_dimensions['F'].width = 30  # MQ 수신 파일
-        sheet.column_dimensions['G'].width = 30  # BW 수신 파일
-        sheet.column_dimensions['H'].width = 15  # 수신 비교 결과
+        sheet.column_dimensions['C'].width = 20  # 송신 테이블
+        sheet.column_dimensions['D'].width = 30  # MQ 송신 파일
+        sheet.column_dimensions['E'].width = 30  # BW 송신 파일
+        sheet.column_dimensions['F'].width = 15  # 송신 비교 결과
+        sheet.column_dimensions['G'].width = 30  # MQ 수신 파일
+        sheet.column_dimensions['H'].width = 30  # BW 수신 파일
+        sheet.column_dimensions['I'].width = 15  # 수신 비교 결과
         
         # 헤더 행 생성
-        headers = ["인터페이스 ID", "인터페이스 명", "MQ 송신 파일", "BW 송신 파일", "송신 비교 결과", 
+        headers = ["인터페이스 ID", "인터페이스 명", "송신 테이블", "MQ 송신 파일", "BW 송신 파일", "송신 비교 결과", 
                   "MQ 수신 파일", "BW 수신 파일", "수신 비교 결과"]
         
         for col_idx, header in enumerate(headers, 1):
@@ -1016,23 +1017,29 @@ class XMLComparator:
         cell.border = border
         cell.alignment = align_left
         
-        # 3. MQ 송신 파일
+        # 3. 송신 테이블
+        send_table = interface_info.get('send_table', '')
+        cell = summary_sheet.cell(row=row, column=3, value=send_table)
+        cell.border = border
+        cell.alignment = align_left
+        
+        # 4. MQ 송신 파일
         mq_send_file = os.path.basename(file_results['send']['path']) if file_results['send']['path'] else "매핑파일없음"
-        cell = summary_sheet.cell(row=row, column=3, value=mq_send_file)
+        cell = summary_sheet.cell(row=row, column=4, value=mq_send_file)
         cell.border = border
         cell.alignment = align_left
         
-        # 4. BW 송신 파일
+        # 5. BW 송신 파일
         bw_send_file = bw_files[0] if bw_files else "매핑파일없음"
-        cell = summary_sheet.cell(row=row, column=4, value=bw_send_file)
+        cell = summary_sheet.cell(row=row, column=5, value=bw_send_file)
         cell.border = border
         cell.alignment = align_left
         
-        # 5. 송신 비교 결과
+        # 6. 송신 비교 결과
         send_result = "일치" if send_comparison and send_comparison.is_equal else "차이"
         if not send_comparison or not file_results['send']['query'] or not result['bw_queries']['send']:
             send_result = "비교불가"
-        cell = summary_sheet.cell(row=row, column=5, value=send_result)
+        cell = summary_sheet.cell(row=row, column=6, value=send_result)
         cell.border = border
         cell.alignment = align_center
         
@@ -1044,23 +1051,23 @@ class XMLComparator:
         else:
             cell.fill = PatternFill(start_color="DDDDDD", end_color="DDDDDD", fill_type="solid")
         
-        # 6. MQ 수신 파일
+        # 7. MQ 수신 파일
         mq_recv_file = os.path.basename(file_results['recv']['path']) if file_results['recv']['path'] else "매핑파일없음"
-        cell = summary_sheet.cell(row=row, column=6, value=mq_recv_file)
+        cell = summary_sheet.cell(row=row, column=7, value=mq_recv_file)
         cell.border = border
         cell.alignment = align_left
         
-        # 7. BW 수신 파일
+        # 8. BW 수신 파일
         bw_recv_file = bw_files[0] if bw_files else "매핑파일없음"
-        cell = summary_sheet.cell(row=row, column=7, value=bw_recv_file)
+        cell = summary_sheet.cell(row=row, column=8, value=bw_recv_file)
         cell.border = border
         cell.alignment = align_left
         
-        # 8. 수신 비교 결과
+        # 9. 수신 비교 결과
         recv_result = "일치" if recv_comparison and recv_comparison.is_equal else "차이"
         if not recv_comparison or not file_results['recv']['query'] or not result['bw_queries']['recv']:
             recv_result = "비교불가"
-        cell = summary_sheet.cell(row=row, column=8, value=recv_result)
+        cell = summary_sheet.cell(row=row, column=9, value=recv_result)
         cell.border = border
         cell.alignment = align_center
         
