@@ -424,10 +424,10 @@ class XMLComparator:
         결과를 저장할 새 엑셀 파일 초기화
         """
         self.output_wb = openpyxl.Workbook()
-        # 기본 시트 제거
+        # 기본 시트의 이름을 변경
         if 'Sheet' in self.output_wb.sheetnames:
             sheet = self.output_wb['Sheet']
-            self.output_wb.remove(sheet)
+            sheet.title = '요약'
     
     def save_excel_output(self, output_path='C:\\work\\LT\\comp_mq_bw.xlsx'):
         """

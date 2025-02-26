@@ -1083,9 +1083,19 @@ class BWQueryExtractor:
                     'recv': [insert 쿼리 목록]
                 }
         """
+        # 모든 쿼리를 추출
+        send_queries = self.extract_send_query(xml_path)
+        recv_queries_full = self.extract_recv_query(xml_path)
+        
+        # 수신 쿼리 중 INSERT 문만 필터링
+        recv_queries = []
+        for orig_query, _, mapped_query in recv_queries_full:
+            if orig_query.lower().startswith('insert'):
+                recv_queries.append(mapped_query)
+        
         return {
-            'send': self.extract_send_query(xml_path),
-            'recv': [mapped_query for _, _, mapped_query in self.extract_recv_query(xml_path)]
+            'send': [query for query in send_queries if query.lower().startswith('select')],
+            'recv': recv_queries
         }
     def get_single_query(self, xml_path: str) -> str:
         """
