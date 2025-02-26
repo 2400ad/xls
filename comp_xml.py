@@ -856,8 +856,8 @@ class XMLComparator:
         interface_count = 0
         processed_count = 0
         
-        # 3열부터 시작 (인터페이스는 3열 간격으로 배치됨)
-        col = 3
+        # B열부터 시작 (인터페이스는 2열부터 시작하도록 변경)
+        col = 2
         
         # 인터페이스 블록 수 확인 (디버깅용)
         while True:
@@ -875,7 +875,7 @@ class XMLComparator:
         
         # 실제 처리 시작
         interface_count = 0
-        col = 3
+        col = 2
         
         while True:
             # 인터페이스 ID 셀 확인
