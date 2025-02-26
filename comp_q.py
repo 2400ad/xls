@@ -935,9 +935,22 @@ class BWQueryExtractor:
         Returns:
             str: 실제 값이 대체된 SQL 쿼리
         """
+        # 순차적 치환 문제 해결을 위해 모든 대체를 한 번에 수행
+        # 1. 대체될 모든 패턴을 고유한 임시 패턴으로 먼저 변환 (충돌 방지)
         result = query
-        for param_name, actual_value in mappings.items():
-            result = result.replace(f":{param_name}", f":{actual_value}")
+        temp_replacements = {}
+        
+        for i, (param_name, actual_value) in enumerate(mappings.items()):
+            # 고유한 임시 패턴 생성 (절대 원본 쿼리에 존재할 수 없는 패턴)
+            temp_pattern = f"__TEMP_PLACEHOLDER_{i}__"
+            # 원래 패턴을 임시 패턴으로 변환
+            result = result.replace(f":{param_name}", temp_pattern)
+            # 임시 패턴을 최종 값으로 매핑
+            temp_replacements[temp_pattern] = f":{actual_value}"
+        
+        # 2. 모든 임시 패턴을 최종 값으로 한 번에 변환
+        for temp_pattern, final_value in temp_replacements.items():
+            result = result.replace(temp_pattern, final_value)
             
         print("\n=== 2단계: Record 매핑 결과 ===")
         print(f"1단계 쿼리: {query}")
