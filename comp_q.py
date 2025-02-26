@@ -936,30 +936,8 @@ class BWQueryExtractor:
             str: 실제 값이 대체된 SQL 쿼리
         """
         result = query
-        
-        # 중복 대체를 방지하기 위한 처리
-        # 실제 컬럼명으로 역매핑 생성 (실제 컬럼명 -> 파라미터 이름 목록)
-        reverse_mappings = {}
         for param_name, actual_value in mappings.items():
-            if actual_value not in reverse_mappings:
-                reverse_mappings[actual_value] = []
-            reverse_mappings[actual_value].append(param_name)
-        
-        # 각 실제 컬럼명에 대해 첫 번째 파라미터만 사용하여 대체
-        for actual_value, param_names in reverse_mappings.items():
-            # 첫 번째 파라미터로만 대체
-            first_param = param_names[0]
-            placeholder = f":{first_param}"
-            
-            # 해당 실제 값을 사용하는 모든 파라미터에 대한 플레이스홀더를 대체
-            for param_name in param_names:
-                result = result.replace(f":{param_name}", f":{actual_value}")
-            
-            # 중복 발생 시 로그 출력
-            if len(param_names) > 1:
-                print(f"\n=== 주의: 중복 매핑 발견 ===")
-                print(f"실제 컬럼 '{actual_value}'에 매핑된 파라미터들: {', '.join(param_names)}")
-                print(f"첫 번째 파라미터 '{first_param}'의 매핑만 사용합니다.")
+            result = result.replace(f":{param_name}", f":{actual_value}")
             
         print("\n=== 2단계: Record 매핑 결과 ===")
         print(f"1단계 쿼리: {query}")
