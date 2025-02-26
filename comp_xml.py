@@ -364,9 +364,9 @@ class XMLComparator:
 
 def main():
     # 고정된 경로 사용
-    excel_path = 'C:\\work\\LT\\input_LT.xlsx'
-    xml_dir = 'C:\\work\\LT\\xml'
-    bw_dir = 'C:\\work\\LT\\BW소스'  # BW 디렉토리 경로도 여기서 설정
+    excel_path = 'C:\\work\\LT\\input_LT.xlsx' # 인터페이스 정보
+    xml_dir = 'C:\\work\\LT\\xml' # MQ XML 파일 디렉토리
+    bw_dir = 'C:\\work\\LT\\BW소스'  # BW XML 파일 디렉토리 경로
     
     # BW 검색 디렉토리 설정
     XMLComparator.BW_SEARCH_DIR = bw_dir

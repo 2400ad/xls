@@ -1,6 +1,8 @@
 import xml.etree.ElementTree as ET
 import re
 from typing import Dict, List, Tuple, Optional
+import os
+import argparse
 
 class QueryDifference:
     def __init__(self):
@@ -617,6 +619,143 @@ class QueryParser:
         
         print("\n" + "=" * 50)
 
+    def compare_mq_bw_queries(self, mq_xml_path: str, bw_xml_path: str) -> Dict[str, List[QueryDifference]]:
+        """
+        MQ XML과 BW XML 파일에서 추출한 송신/수신 쿼리를 비교합니다.
+        
+        Args:
+            mq_xml_path (str): MQ XML 파일 경로
+            bw_xml_path (str): BW XML 파일 경로
+            
+        Returns:
+            Dict[str, List[QueryDifference]]: 송신/수신별 쿼리 비교 결과
+                {
+                    'send': [송신 쿼리 비교 결과 목록],
+                    'recv': [수신 쿼리 비교 결과 목록]
+                }
+        """
+        results = {
+            'send': [],
+            'recv': []
+        }
+        
+        # MQ XML 파싱
+        mq_queries = self.parse_xml_file(mq_xml_path)
+        if not mq_queries:
+            print(f"Failed to parse MQ XML file: {mq_xml_path}")
+            return results
+            
+        mq_select_queries, mq_insert_queries = mq_queries
+        
+        # BW XML 파싱
+        bw_extractor = BWQueryExtractor()
+        bw_queries = bw_extractor.extract_bw_queries(bw_xml_path)
+        if not bw_queries:
+            print(f"Failed to parse BW XML file: {bw_xml_path}")
+            return results
+        
+        bw_send_queries = bw_queries.get('send', [])
+        bw_recv_queries = bw_queries.get('recv', [])
+        
+        # 송신 쿼리 비교 (SELECT)
+        if mq_select_queries and bw_send_queries:
+            print("\n===== 송신 쿼리 비교 (SELECT) =====")
+            for mq_query in mq_select_queries:
+                for bw_query in bw_send_queries:
+                    diff = self.compare_queries(mq_query, bw_query)
+                    if diff:
+                        results['send'].append(diff)
+                        self.print_query_differences(diff)
+        else:
+            print("송신 쿼리 비교를 위한 데이터가 부족합니다.")
+            
+        # 수신 쿼리 비교 (INSERT)
+        if mq_insert_queries and bw_recv_queries:
+            print("\n===== 수신 쿼리 비교 (INSERT) =====")
+            for mq_query in mq_insert_queries:
+                for bw_query in bw_recv_queries:
+                    diff = self.compare_queries(mq_query, bw_query)
+                    if diff:
+                        results['recv'].append(diff)
+                        self.print_query_differences(diff)
+        else:
+            print("수신 쿼리 비교를 위한 데이터가 부족합니다.")
+            
+        return results
+
+    def compare_mq_bw_queries_by_interface_id(self, interface_id: str, mq_folder_path: str, bw_folder_path: str) -> Dict[str, List[QueryDifference]]:
+        """
+        인터페이스 ID를 기준으로 MQ XML과 BW XML 파일을 찾아 쿼리를 비교합니다.
+        
+        Args:
+            interface_id (str): 인터페이스 ID
+            mq_folder_path (str): MQ XML 파일이 있는 폴더 경로
+            bw_folder_path (str): BW XML 파일이 있는 폴더 경로
+            
+        Returns:
+            Dict[str, List[QueryDifference]]: 송신/수신별 쿼리 비교 결과
+        """
+        results = {
+            'send': [],
+            'recv': []
+        }
+        
+        # MQ XML 파일 찾기
+        searcher = FileSearcher()
+        mq_files = searcher.find_files_with_keywords(mq_folder_path, [interface_id])
+        
+        if not mq_files or not mq_files.get(interface_id):
+            print(f"No MQ XML files found for interface ID: {interface_id}")
+            return results
+            
+        mq_xml_path = mq_files[interface_id][0] if mq_files[interface_id] else None
+        if not mq_xml_path:
+            print(f"No MQ XML file found for interface ID: {interface_id}")
+            return results
+            
+        # MQ XML에서 테이블 이름 추출
+        mq_queries = self.parse_xml_file(mq_xml_path)
+        if not mq_queries or not mq_queries[0]:
+            print(f"Failed to extract SELECT query from MQ XML: {mq_xml_path}")
+            return results
+            
+        table_name = self.extract_table_name(mq_queries[0][0]) if mq_queries[0] else None
+        if not table_name:
+            print(f"Failed to extract table name from MQ XML SELECT query")
+            return results
+            
+        print(f"Found table name from MQ XML: {table_name}")
+        
+        # BW XML 파일 찾기
+        bw_files = searcher.find_files_with_keywords(bw_folder_path, [table_name])
+        
+        if not bw_files or not bw_files.get(table_name):
+            print(f"No BW XML files found for table name: {table_name}")
+            return results
+            
+        bw_xml_paths = bw_files[table_name] if bw_files.get(table_name) else []
+        if not bw_xml_paths:
+            print(f"No BW XML files found for table name: {table_name}")
+            return results
+            
+        # 각 BW XML 파일과 비교
+        all_results = {
+            'send': [],
+            'recv': []
+        }
+        
+        for bw_xml_path in bw_xml_paths:
+            print(f"\nComparing MQ XML ({mq_xml_path}) with BW XML ({bw_xml_path}):")
+            curr_results = self.compare_mq_bw_queries(mq_xml_path, bw_xml_path)
+            
+            if curr_results['send']:
+                all_results['send'].extend(curr_results['send'])
+                
+            if curr_results['recv']:
+                all_results['recv'].extend(curr_results['recv'])
+                
+        return all_results
+
 class BWQueryExtractor:
     """TIBCO BW XML 파일에서 특정 태그 구조에 따라 SQL 쿼리를 추출하는 클래스"""
     
@@ -1044,115 +1183,45 @@ class FileSearcher:
 
 # Test the query comparison
 if __name__ == "__main__":
-    # Create QueryParser instance
-    parser = QueryParser()
+    import argparse
     
-    # Test SELECT queries with different column orders
-    select1 = """
-    SELECT a, b, c FROM d
-    """
-    select2 = """
-    SELECT b, a, c 
-    FROM d
-    """
+    parser = argparse.ArgumentParser(description="Compare SQL queries in MQ and BW XML files")
+    subparsers = parser.add_subparsers(dest="command", help="Command to execute")
     
-    # Test INSERT queries with different values
-    insert1 = """
-    INSERT INTO table1 (a, b, c) VALUES ( :a, 'N', :code)
-    """
-    insert2 = """
-    INSERT INTO table1 (a, c, b) 
-    VALUES 
-    ( :a, :code, 'Y')
-    """
+    # 테이블 검색 명령
+    table_parser = subparsers.add_parser("find_table", help="Find files containing a specific table")
+    table_parser.add_argument("folder_path", help="Folder path to search in")
+    table_parser.add_argument("table_name", help="Table name to search for")
     
-    # Compare queries and print differences
-    select_diff = parser.compare_queries(select1, select2)
-    insert_diff = parser.compare_queries(insert1, insert2)
+    # 쿼리 비교 명령
+    compare_parser = subparsers.add_parser("compare", help="Compare MQ and BW queries")
+    compare_parser.add_argument("mq_xml", help="MQ XML file path")
+    compare_parser.add_argument("bw_xml", help="BW XML file path")
     
-    print("\nComparing SELECT queries:")
-    print(f"Query 1:\n{select1}")
-    print(f"Query 2:\n{select2}")
-    parser.print_query_differences(select_diff)
+    # 인터페이스 ID로 비교 명령
+    interface_parser = subparsers.add_parser("compare_by_id", help="Compare by interface ID")
+    interface_parser.add_argument("interface_id", help="Interface ID")
+    interface_parser.add_argument("mq_folder", help="MQ XML folder path")
+    interface_parser.add_argument("bw_folder", help="BW XML folder path")
     
-    print("\nComparing INSERT queries:")
-    print(f"Query 1:\n{insert1}")
-    print(f"Query 2:\n{insert2}")
-    parser.print_query_differences(insert_diff)
-
-    # Test with the example queries from the previous test
-    qry1 = """
-    INSERT INTO A2EDC_MGR.TB_EDC_IFI_ECO_TARGET_GLS_N_I (
-         EAI_SEQ_ID, DATA_INTERFACE_TYPE_CODE,
-         EAI_INTERFACE_DATE, APPLICATION_TRANSFER_FLAG,
-         ECO_ID, VALIDATION_SEQS,
-         EMEMO_ID, LOT_ID,
-         GLASS_ID, SLOT_ID,
-         CASSETTE_ID, FMC_REQUEST_TITLE
-            )
-    VALUES (
-         :EAI_SEQ_ID, :DATA_INTERFACE_TYPE_CODE,
-         SYSDATE, 'N',
-         :ECO_ID, :VALIDATION_SEQS,
-         :EMEMO_ID, :LOT_ID,
-         :GLASS_ID, :SLOT_ID,
-         :CASSETTE_ID, :FMC_REQUEST_TITLE
-    )
-    """
-    qry2 = """
-    INSERT INTO A2EDC_MGR.TB_EDC_IFI_ECO_TARGET_GLS_N_I (
-         EAI_SEQ_ID, 
-         DATA_INTERFACE_TYPE_CODE,
-         EAI_INTERFACE_DATE, APPLICATION_TRANSFER_FLAG,
-         ECO_ID, VALIDATION_SEQS,
-         EMEMO_ID, LOT_ID,
-         GLASS_ID, SLOT_ID,
-         CASSETTE_ID, FMC_REQUEST_TITLE
-            )
-    VALUES (
-         :EAI_SEQ_ID, 
-         :DATA_INTERFACE_TYPE_CODE,
-         SYSDATE, 'Y',
-         :ECO_ID, 
-         :VALIDATION_SEQS,
-         :EMEMO_ID, :LOT_ID,
-         :GLASS_ID, :SLOT_ID,
-         :CASSETTE_ID, :FMC_REQUEST_TITLE
-    )
-    """
+    args = parser.parse_args()
     
-    complex_diff = parser.compare_queries(qry1, qry2)
-    print("\nComparing complex INSERT queries:")
-    print(f"Query 1:\n{qry1}")
-    print(f"Query 2:\n{qry2}")
-    parser.print_query_differences(complex_diff)
-
-    # Test with XML file if provided
-    try:
-        parser = QueryParser()
-        select_queries, insert_queries = parser.parse_xml_file("mq_snd.xml")
-        parser.print_queries()
-    except:
-        pass
-
-    parser = QueryParser()
-    select_queries, insert_queries = parser.parse_xml_file("mq_rcv.xml")
-    parser.print_queries()  # To see all extracted queries
-
-    # Test file search functionality
-    print("\nTesting file search functionality:")
-    folder_path = "."  # Current directory
-    keywords = ["GSMOD.H8ASSY", "RCV"]
+    query_parser = QueryParser()
     
-    searcher = FileSearcher()
-    results = searcher.find_files_with_keywords(folder_path, keywords)
-    searcher.print_search_results(results)
-
-    # Test table search functionality
-    print("\nTesting table search functionality:")
-    folder_path = "."  # Current directory
-    table_name = "XXWMSV.XXWMSV_KIT_RCPT_S_I"  # Example table name
-    
-    parser = QueryParser()
-    table_results = parser.find_files_by_table(folder_path, table_name)
-    parser.print_table_search_results(table_results, table_name)
+    if args.command == "find_table":
+        table_results = query_parser.find_files_by_table(args.folder_path, args.table_name)
+        query_parser.print_table_search_results(table_results, args.table_name)
+    elif args.command == "compare":
+        comparison_results = query_parser.compare_mq_bw_queries(args.mq_xml, args.bw_xml)
+        print("\nComparison Results Summary:")
+        print(f"송신 쿼리 비교 결과: {len(comparison_results['send'])} 개의 차이점 발견")
+        print(f"수신 쿼리 비교 결과: {len(comparison_results['recv'])} 개의 차이점 발견")
+    elif args.command == "compare_by_id":
+        comparison_results = query_parser.compare_mq_bw_queries_by_interface_id(
+            args.interface_id, args.mq_folder, args.bw_folder
+        )
+        print("\nComparison Results Summary:")
+        print(f"송신 쿼리 비교 결과: {len(comparison_results['send'])} 개의 차이점 발견")
+        print(f"수신 쿼리 비교 결과: {len(comparison_results['recv'])} 개의 차이점 발견")
+    else:
+        parser.print_help()
