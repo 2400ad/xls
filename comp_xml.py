@@ -975,54 +975,54 @@ class XMLComparator:
             print(f"\n엑셀 파일이 저장되었습니다: {self.output_path}")
         else:
             print("\n처리된 인터페이스가 없어 엑셀 파일을 생성하지 않았습니다.")
-{{ ... }}
-    def main():
-        # 고정된 경로 사용
-        excel_path = 'C:\\work\\LT\\input_LT.xlsx' # 인터페이스 정보
-        xml_dir = 'C:\\work\\LT\\xml' # MQ XML 파일 디렉토리
-        bw_dir = 'C:\\work\\LT\\BW소스'  # BW XML 파일 디렉토리 경로
-        
-        # BW 검색 디렉토리 설정
-        XMLComparator.BW_SEARCH_DIR = bw_dir
-        
-        comparator = XMLComparator(excel_path, xml_dir)
-        
-        # 명령행 인자가 있을 경우 처리
-        if len(sys.argv) > 1:
-            if sys.argv[1] == "excel":
-                # 엑셀 출력 모드 실행
-                print("\n[MQ XML과 BW XML 쿼리 비교 - 엑셀 출력 모드]")
-                comparator.process_all_interfaces_with_bw()
-                return
-        
-        # 기본 모드 실행 - 기존 로직 유지
-        print("\n[MQ XML 파일 검색 및 쿼리 비교 시작]")
-        comparator.process_all_interfaces()
-        
-        # BW 파일 검색 및 결과 출력을 마지막으로 이동
-        print("\n[BW 파일 검색 시작]")
-        bw_results = comparator.find_bw_files()
-        comparator.print_bw_search_results(bw_results)
-        
-        # BW 파일에서 쿼리 추출
-        print("\n[BW 파일 쿼리 추출]")
-        print("-" * 80)
-        extractor = BWQueryExtractor()  # BWQueryExtractor 사용
-        for result in bw_results:
-            if result['bw_files']:  # BW 파일이 있는 경우에만 처리
-                print(f"\n인터페이스: {result['interface_name']} ({result['interface_id']})")
-                print(f"송신 테이블: {result['send_table']}")
-                print("찾은 BW 파일의 쿼리:")
-                for bw_file in result['bw_files']:
-                    bw_file_path = os.path.join(bw_dir, bw_file)
-                    if os.path.exists(bw_file_path):
-                        query = extractor.get_single_query(bw_file_path)  # BWQueryExtractor의 get_single_query 사용
-                        if query:
-                            print(f"\nBW 파일: {bw_file}")
-                            print("-" * 40)
-                            print(query)
-                        else:
-                            print(f"\nBW 파일: {bw_file} - 쿼리를 찾을 수 없음")
+
+def main():
+    # 고정된 경로 사용
+    excel_path = 'C:\\work\\LT\\input_LT.xlsx' # 인터페이스 정보
+    xml_dir = 'C:\\work\\LT\\xml' # MQ XML 파일 디렉토리
+    bw_dir = 'C:\\work\\LT\\BW소스'  # BW XML 파일 디렉토리 경로
+    
+    # BW 검색 디렉토리 설정
+    XMLComparator.BW_SEARCH_DIR = bw_dir
+    
+    comparator = XMLComparator(excel_path, xml_dir)
+    
+    # 명령행 인자가 있을 경우 처리
+    if len(sys.argv) > 1:
+        if sys.argv[1] == "excel":
+            # 엑셀 출력 모드 실행
+            print("\n[MQ XML과 BW XML 쿼리 비교 - 엑셀 출력 모드]")
+            comparator.process_all_interfaces_with_bw()
+            return
+    
+    # 기본 모드 실행 - 기존 로직 유지
+    print("\n[MQ XML 파일 검색 및 쿼리 비교 시작]")
+    comparator.process_all_interfaces()
+    
+    # BW 파일 검색 및 결과 출력을 마지막으로 이동
+    print("\n[BW 파일 검색 시작]")
+    bw_results = comparator.find_bw_files()
+    comparator.print_bw_search_results(bw_results)
+    
+    # BW 파일에서 쿼리 추출
+    print("\n[BW 파일 쿼리 추출]")
+    print("-" * 80)
+    extractor = BWQueryExtractor()  # BWQueryExtractor 사용
+    for result in bw_results:
+        if result['bw_files']:  # BW 파일이 있는 경우에만 처리
+            print(f"\n인터페이스: {result['interface_name']} ({result['interface_id']})")
+            print(f"송신 테이블: {result['send_table']}")
+            print("찾은 BW 파일의 쿼리:")
+            for bw_file in result['bw_files']:
+                bw_file_path = os.path.join(bw_dir, bw_file)
+                if os.path.exists(bw_file_path):
+                    query = extractor.get_single_query(bw_file_path)  # BWQueryExtractor의 get_single_query 사용
+                    if query:
+                        print(f"\nBW 파일: {bw_file}")
+                        print("-" * 40)
+                        print(query)
+                    else:
+                        print(f"\nBW 파일: {bw_file} - 쿼리를 찾을 수 없음")
 
     print("\n[처리 완료]")
     print("엑셀 출력 모드로 실행하려면 'python comp_xml.py excel' 명령을 사용하세요.")
