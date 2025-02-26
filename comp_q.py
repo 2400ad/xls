@@ -866,6 +866,9 @@ class BWQueryExtractor:
             Dict[str, str]: 파라미터 이름과 매핑된 실제 값의 딕셔너리
         """
         mappings = {}
+        # 이미 매핑된 실제 컬럼 값을 추적하는 집합
+        mapped_values = set()
+        
         input_bindings = activity.find('.//pd:inputBindings', self.ns)
         if input_bindings is None:
             print("\n=== inputBindings 태그를 찾을 수 없음 ===")
@@ -890,7 +893,10 @@ class BWQueryExtractor:
                 print(f"\n파라미터 '{param_name}' 매핑 검색:")
                 param_element = record.find(f'.//{param_name}')
                 if param_element is not None:
-                    # value-of 체크
+                    # 매핑 타입별로 값을 추출하되, 중복 매핑을 방지
+                    mapping_found = False
+                    
+                    # value-of 체크 (우선 순위 1)
                     value_of = param_element.find('.//xsl:value-of', self.ns)
                     if value_of is not None:
                         select_attr = value_of.get('select', '')
@@ -899,18 +905,20 @@ class BWQueryExtractor:
                             value = select_attr.split('/')[-1]
                             mappings[param_name] = value
                             print(f"value-of 매핑 발견: {param_name} -> {value}")
+                            mapping_found = True
                     
-                    # choose/when 체크
-                    choose = param_element.find('.//xsl:choose', self.ns)
-                    if choose is not None:
-                        when = choose.find('.//xsl:when', self.ns)
-                        if when is not None:
-                            test_attr = when.get('test', '')
-                            if 'exists(' in test_attr:
-                                # exists(BANANA)와 같은 형식에서 변수 이름 추출
-                                value = test_attr[test_attr.find('(')+1:test_attr.find(')')]
-                                mappings[param_name] = value
-                                print(f"choose/when 매핑 발견: {param_name} -> {value}")
+                    # choose/when 체크 (우선 순위 2, value-of가 없을 경우만)
+                    if not mapping_found:
+                        choose = param_element.find('.//xsl:choose', self.ns)
+                        if choose is not None:
+                            when = choose.find('.//xsl:when', self.ns)
+                            if when is not None:
+                                test_attr = when.get('test', '')
+                                if 'exists(' in test_attr:
+                                    # exists(BANANA)와 같은 형식에서 변수 이름 추출
+                                    value = test_attr[test_attr.find('(')+1:test_attr.find(')')]
+                                    mappings[param_name] = value
+                                    print(f"choose/when 매핑 발견: {param_name} -> {value}")
                 else:
                     print(f"'{param_name}'에 대한 매핑을 찾을 수 없음")
 
@@ -928,8 +936,30 @@ class BWQueryExtractor:
             str: 실제 값이 대체된 SQL 쿼리
         """
         result = query
+        
+        # 중복 대체를 방지하기 위한 처리
+        # 실제 컬럼명으로 역매핑 생성 (실제 컬럼명 -> 파라미터 이름 목록)
+        reverse_mappings = {}
         for param_name, actual_value in mappings.items():
-            result = result.replace(f":{param_name}", f":{actual_value}")
+            if actual_value not in reverse_mappings:
+                reverse_mappings[actual_value] = []
+            reverse_mappings[actual_value].append(param_name)
+        
+        # 각 실제 컬럼명에 대해 첫 번째 파라미터만 사용하여 대체
+        for actual_value, param_names in reverse_mappings.items():
+            # 첫 번째 파라미터로만 대체
+            first_param = param_names[0]
+            placeholder = f":{first_param}"
+            
+            # 해당 실제 값을 사용하는 모든 파라미터에 대한 플레이스홀더를 대체
+            for param_name in param_names:
+                result = result.replace(f":{param_name}", f":{actual_value}")
+            
+            # 중복 발생 시 로그 출력
+            if len(param_names) > 1:
+                print(f"\n=== 주의: 중복 매핑 발견 ===")
+                print(f"실제 컬럼 '{actual_value}'에 매핑된 파라미터들: {', '.join(param_names)}")
+                print(f"첫 번째 파라미터 '{first_param}'의 매핑만 사용합니다.")
             
         print("\n=== 2단계: Record 매핑 결과 ===")
         print(f"1단계 쿼리: {query}")
