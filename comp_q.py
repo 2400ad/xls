@@ -95,71 +95,162 @@ class QueryParser:
                 columns[col] = col
         return columns if columns else None
 
-    def parse_insert_parts(self, query) -> Optional[Tuple[str, Dict[str, str]]]:
-        """Extract and return table name and column-value pairs from INSERT query"""
-        # 정규화된 쿼리 사용
-        query = self.normalize_query(query)
-        print(f"\nProcessing INSERT query:\n{query}")
+    def _extract_values_with_balanced_parentheses(self, query, start_idx):
+        """
+        INSERT 쿼리에서 VALUES 절의 내용을 괄호 균형을 맞추며 추출
         
-        # INSERT INTO와 테이블 이름 추출
-        table_match = re.search(r'INSERT\s+INTO\s+([A-Za-z0-9_$.]+)', query, flags=re.IGNORECASE)
-        if not table_match:
-            print("Failed to match INSERT INTO pattern")
-            return None
+        Args:
+            query (str): 전체 쿼리 문자열
+            start_idx (int): VALUES 키워드 이후의 시작 인덱스
             
-        table_name = table_match.group(1)
-        print(f"Found table name: {table_name}")
-        
-        # 컬럼과 값 추출
-        pattern = r'\((.*?)\)\s*VALUES\s*\((.*?)\)'
-        cols_match = re.search(pattern, query, flags=re.IGNORECASE | re.DOTALL)
-        if not cols_match:
-            print("Failed to match columns and values pattern")
-            return None
-            
-        # 컬럼 파싱
-        col_names = [c.strip() for c in cols_match.group(1).split(',')]
-        
-        # 값 파싱 - 함수 호출을 고려한 파싱
-        values_str = cols_match.group(2)
-        col_values = []
-        current_value = ""
+        Returns:
+            str: 추출된 VALUES 절 내용 (괄호 포함)
+        """
         paren_count = 0
+        in_quotes = False
+        quote_char = None
+        idx = start_idx
         
-        for char in values_str:
-            if char == ',' and paren_count == 0:
-                if current_value:
-                    col_values.append(current_value.strip())
-                    current_value = ""
-            else:
+        while idx < len(query):
+            char = query[idx]
+            
+            # 따옴표 처리 ('나 " 내부에서는 괄호를 계산하지 않음)
+            if char in ["'", '"'] and (idx == 0 or query[idx-1] != '\\'):
+                if not in_quotes:
+                    in_quotes = True
+                    quote_char = char
+                elif char == quote_char:
+                    in_quotes = False
+            
+            # 괄호 카운팅 (따옴표 밖에서만)
+            if not in_quotes:
+                if char == '(':
+                    paren_count += 1
+                    if paren_count == 1 and idx == start_idx:  # 시작 괄호
+                        start_idx = idx
+                elif char == ')':
+                    paren_count -= 1
+                    if paren_count == 0:  # 종료 괄호 도달
+                        return query[start_idx:idx+1]
+            
+            idx += 1
+        
+        # 괄호가 맞지 않는 경우
+        return None
+
+    def _parse_csv_with_functions(self, csv_string):
+        """
+        함수 호출과 따옴표를 고려하여 CSV 문자열을 파싱합니다.
+        
+        Args:
+            csv_string (str): 파싱할 CSV 문자열
+            
+        Returns:
+            List[str]: 파싱된 값 목록
+        """
+        results = []
+        current = ""
+        paren_count = 0
+        in_quotes = False
+        quote_char = None
+        
+        for i, char in enumerate(csv_string):
+            # 따옴표 처리
+            if char in ["'", '"'] and (i == 0 or csv_string[i-1] != '\\'):
+                if not in_quotes:
+                    in_quotes = True
+                    quote_char = char
+                elif char == quote_char:
+                    in_quotes = False
+            
+            # 괄호 카운팅 (따옴표 안이 아닐 때)
+            if not in_quotes:
                 if char == '(':
                     paren_count += 1
                 elif char == ')':
                     paren_count -= 1
-                current_value += char
+                    
+                # 값 구분자 처리
+                if char == ',' and paren_count == 0:
+                    results.append(current.strip())
+                    current = ""
+                    continue
+            
+            # 현재 문자 추가
+            current += char
         
-        if current_value:  # 마지막 값 추가
-            col_values.append(current_value.strip())
-        
-        print(f"Found columns: {col_names}")
-        print(f"Found values: {col_values}")
-        
-        # 컬럼과 값의 개수가 일치하는지 확인
-        if len(col_names) != len(col_values):
-            print(f"Column count ({len(col_names)}) does not match value count ({len(col_values)})")
+        # 마지막 값 추가
+        if current:
+            results.append(current.strip())
+            
+        return results
+
+    def parse_insert_parts(self, query) -> Optional[Tuple[str, Dict[str, str]]]:
+        """Extract and return table name and column-value pairs from INSERT query"""
+        try:
+            # 정규화된 쿼리 사용
+            query = self.normalize_query(query)
+            print(f"\nProcessing INSERT query:\n{query}")
+            
+            # INSERT INTO와 테이블 이름 추출
+            table_match = re.search(r'INSERT\s+INTO\s+([A-Za-z0-9_$.]+)', query, flags=re.IGNORECASE)
+            if not table_match:
+                print("Failed to match INSERT INTO pattern")
+                return None
+                
+            table_name = table_match.group(1)
+            print(f"Found table name: {table_name}")
+            
+            # 컬럼 목록 추출
+            columns_match = re.search(r'INSERT\s+INTO\s+[A-Za-z0-9_$.]+\s*\((.*?)\)', query, flags=re.IGNORECASE | re.DOTALL)
+            if not columns_match:
+                print("Failed to match columns pattern")
+                return None
+                
+            col_names = [c.strip() for c in columns_match.group(1).split(',')]
+            
+            # VALUES 키워드 찾기
+            values_match = re.search(r'VALUES\s*\(', query, flags=re.IGNORECASE)
+            if not values_match:
+                print("Failed to find VALUES keyword")
+                return None
+                
+            # VALUES 절 추출 (괄호 균형 맞추며)
+            values_start_idx = values_match.end() - 1  # '(' 위치
+            values_part = self._extract_values_with_balanced_parentheses(query, values_start_idx)
+            
+            if not values_part:
+                print("Failed to extract balanced VALUES part")
+                return None
+                
+            # 괄호 제거하고 값만 추출
+            values_str = values_part[1:-1]  # 시작과 끝 괄호 제거
+            
+            # 값 파싱 - 함수 호출을 고려한 파싱
+            col_values = self._parse_csv_with_functions(values_str)
+            
+            print(f"Found columns: {col_names}")
+            print(f"Found values: {col_values}")
+            
+            # 컬럼과 값의 개수가 일치하는지 확인
+            if len(col_names) != len(col_values):
+                print(f"Column count ({len(col_names)}) does not match value count ({len(col_values)})")
+                return None
+                
+            # 빈 컬럼이나 값이 있는지 확인
+            if not all(col_names) or not all(col_values):
+                print("Found empty column names or values")
+                return None
+                
+            columns = {}
+            for name, value in zip(col_names, col_values):
+                columns[name] = value
+                
+            print(f"Successfully parsed {len(columns)} columns")
+            return (table_name, columns)
+        except Exception as e:
+            print(f"Error parsing INSERT parts: {str(e)}")
             return None
-            
-        # 빈 컬럼이나 값이 있는지 확인
-        if not all(col_names) or not all(col_values):
-            print("Found empty column names or values")
-            return None
-            
-        columns = {}
-        for name, value in zip(col_names, col_values):
-            columns[name] = value
-            
-        print(f"Successfully parsed {len(columns)} columns")
-        return (table_name, columns) if columns else None
 
     def compare_queries(self, query1: str, query2: str) -> QueryDifference:
         """
@@ -426,11 +517,11 @@ class QueryParser:
                 if elem.text:
                     text = elem.text.strip()
                     # Extract SELECT queries
-                    if re.search(r'SELECT\s+', text, flags=re.IGNORECASE):
+                    if re.search(r'SELECT', text, flags=re.IGNORECASE):
                         cleaned_query = self.clean_select_query(text)
                         self.select_queries.append(cleaned_query)
                     # Extract INSERT queries
-                    elif re.search(r'INSERT\s+INTO\s+', text, flags=re.IGNORECASE):
+                    elif re.search(r'INSERT', text, flags=re.IGNORECASE):
                         cleaned_query = self.clean_insert_query(text)
                         self.insert_queries.append(cleaned_query)
             
