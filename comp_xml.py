@@ -588,18 +588,13 @@ class XMLComparator:
             # 차이점 설명
             diff_text = []
             
-            if diff.has_difference:
+            if not diff.is_equal:
                 diff_text.append("※ 차이점 있음")
                 
-                if diff.missing_columns:
-                    diff_text.append(f"- 누락된 컬럼: {', '.join(diff.missing_columns)}")
-                    
-                if diff.extra_columns:
-                    diff_text.append(f"- 추가된 컬럼: {', '.join(diff.extra_columns)}")
-                    
-                if diff.different_values:
-                    for col, (val1, val2) in diff.different_values.items():
-                        diff_text.append(f"- 컬럼 '{col}': '{val1}' ↔ '{val2}'")
+                for difference in diff.differences:
+                    diff_text.append(f"- 컬럼: {difference['column']}")
+                    diff_text.append(f"  - Excel: {difference['query1_value']}")
+                    diff_text.append(f"  - 파일: {difference['query2_value']}")
             else:
                 diff_text.append("※ 차이점 없음")
             
@@ -668,18 +663,13 @@ class XMLComparator:
             # 차이점 설명
             diff_text = []
             
-            if diff.has_difference:
+            if not diff.is_equal:
                 diff_text.append("※ 차이점 있음")
                 
-                if diff.missing_columns:
-                    diff_text.append(f"- 누락된 컬럼: {', '.join(diff.missing_columns)}")
-                    
-                if diff.extra_columns:
-                    diff_text.append(f"- 추가된 컬럼: {', '.join(diff.extra_columns)}")
-                    
-                if diff.different_values:
-                    for col, (val1, val2) in diff.different_values.items():
-                        diff_text.append(f"- 컬럼 '{col}': '{val1}' ↔ '{val2}'")
+                for difference in diff.differences:
+                    diff_text.append(f"- 컬럼: {difference['column']}")
+                    diff_text.append(f"  - Excel: {difference['query1_value']}")
+                    diff_text.append(f"  - 파일: {difference['query2_value']}")
             else:
                 diff_text.append("※ 차이점 없음")
             
@@ -918,15 +908,12 @@ class XMLComparator:
                 print("\n[송신 SELECT 쿼리 비교]")
                 if result['comparisons']['send']:
                     diff = result['comparisons']['send']
-                    if diff.has_difference:
+                    if not diff.is_equal:
                         print("※ 차이점 있음")
-                        if diff.missing_columns:
-                            print(f"- 누락된 컬럼: {', '.join(diff.missing_columns)}")
-                        if diff.extra_columns:
-                            print(f"- 추가된 컬럼: {', '.join(diff.extra_columns)}")
-                        if diff.different_values:
-                            for col, (val1, val2) in diff.different_values.items():
-                                print(f"- 컬럼 '{col}': '{val1}' ↔ '{val2}'")
+                        for difference in diff.differences:
+                            print(f"- 컬럼: {difference['column']}")
+                            print(f"  - Excel: {difference['query1_value']}")
+                            print(f"  - 파일: {difference['query2_value']}")
                     else:
                         print("※ 차이점 없음")
                 else:
@@ -936,15 +923,12 @@ class XMLComparator:
                 print("\n[수신 INSERT 쿼리 비교]")
                 if result['comparisons']['recv']:
                     diff = result['comparisons']['recv']
-                    if diff.has_difference:
+                    if not diff.is_equal:
                         print("※ 차이점 있음")
-                        if diff.missing_columns:
-                            print(f"- 누락된 컬럼: {', '.join(diff.missing_columns)}")
-                        if diff.extra_columns:
-                            print(f"- 추가된 컬럼: {', '.join(diff.extra_columns)}")
-                        if diff.different_values:
-                            for col, (val1, val2) in diff.different_values.items():
-                                print(f"- 컬럼 '{col}': '{val1}' ↔ '{val2}'")
+                        for difference in diff.differences:
+                            print(f"- 컬럼: {difference['column']}")
+                            print(f"  - Excel: {difference['query1_value']}")
+                            print(f"  - 파일: {difference['query2_value']}")
                     else:
                         print("※ 차이점 없음")
                 else:
