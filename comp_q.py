@@ -91,10 +91,29 @@ class QueryParser:
             return None
             
         columns = {}
-        for col in match.group(1).split(','):
+        # 컬럼 분리시 괄호를 고려하여 처리
+        for col in self._parse_csv_with_functions(match.group(1)):
             col = col.strip()
-            if col:  # 빈 문자열이 아닌 경우만 처리
-                columns[col] = col
+            if not col:  # 빈 문자열인 경우 스킵
+                continue
+                
+            # SQL 함수나 표현식에서 별칭 추출
+            # AS 키워드 또는 별칭만 있는 경우 처리
+            alias_match = re.search(r'(.+?)\s+(?:AS\s+)?([a-zA-Z0-9_]+)$', col)
+            
+            if alias_match:
+                # 식과 별칭이 존재하는 경우: to_char(tdate, 'YYYYMMDDHH24MISS') tdate
+                expr, alias = alias_match.groups()
+                expr = expr.strip()
+                alias = alias.strip()
+                
+                # 원래 컬럼식을 키로 저장 (비교를 위해)
+                # 별칭과 표현식을 함께 저장
+                columns[expr] = {'expr': expr, 'alias': alias, 'full': col}
+            else:
+                # 별칭이 없는 경우: to_char(tdate, 'YYYYMMDDHH24MISS')
+                columns[col] = {'expr': col, 'alias': None, 'full': col}
+        
         return columns if columns else None
 
     def _extract_values_with_balanced_parentheses(self, query, start_idx):
@@ -301,21 +320,104 @@ class QueryParser:
         direction = 'recv' if result.query_type == 'INSERT' else 'send'
         special_cols = set(self.special_columns[direction]['required'])
         
-        # 일반 컬럼만 비교 (대소문자 구분 없이 비교하되 원본 케이스 유지)
-        columns1_filtered = {k: v for k, v in columns1.items() if k.upper() not in special_cols}
-        columns2_filtered = {k: v for k, v in columns2.items() if k.upper() not in special_cols}
-        
-        # 컬럼 비교
-        all_columns = set(columns1_filtered.keys()) | set(columns2_filtered.keys())
-        for col in all_columns:
-            if col not in columns1_filtered:
-                result.add_difference(col, None, columns2_filtered[col])
-            elif col not in columns2_filtered:
-                result.add_difference(col, columns1_filtered[col], None)
-            elif columns1_filtered[col] != columns2_filtered[col]:
-                result.add_difference(col, columns1_filtered[col], columns2_filtered[col])
+        # 정규화된 비교를 위해 컬럼 처리
+        if result.query_type == 'SELECT':
+            # 결과가 동일한지 계산
+            result.is_equal = self._compare_select_columns(columns1, columns2, special_cols, result)
+        else:
+            # 일반 컬럼만 비교 (대소문자 구분 없이 비교하되 원본 케이스 유지)
+            columns1_filtered = {k: v for k, v in columns1.items() if k.upper() not in special_cols}
+            columns2_filtered = {k: v for k, v in columns2.items() if k.upper() not in special_cols}
+            
+            # 컬럼 비교
+            all_columns = set(columns1_filtered.keys()) | set(columns2_filtered.keys())
+            is_equal = True
+            for col in all_columns:
+                if col not in columns1_filtered:
+                    result.add_difference(col, None, columns2_filtered[col])
+                    is_equal = False
+                elif col not in columns2_filtered:
+                    result.add_difference(col, columns1_filtered[col], None)
+                    is_equal = False
+                elif columns1_filtered[col] != columns2_filtered[col]:
+                    result.add_difference(col, columns1_filtered[col], columns2_filtered[col])
+                    is_equal = False
+            
+            result.is_equal = is_equal
                 
         return result
+    
+    def _compare_select_columns(self, columns1, columns2, special_cols, result):
+        """
+        SELECT 쿼리의 컬럼을 비교하는 보조 메소드
+        
+        Args:
+            columns1: 첫 번째 쿼리의 컬럼 정보
+            columns2: 두 번째 쿼리의 컬럼 정보
+            special_cols: 특수 컬럼 집합
+            result: 결과를 저장할 QueryDifference 객체
+            
+        Returns:
+            bool: 두 쿼리의 컬럼이 동일한지 여부
+        """
+        # 일반 컬럼만 필터링 (특수 컬럼 제외)
+        columns1_filtered = {k: v for k, v in columns1.items() 
+                            if k.upper() not in special_cols and 
+                              (v['alias'] is None or v['alias'].upper() not in special_cols)}
+        columns2_filtered = {k: v for k, v in columns2.items() 
+                            if k.upper() not in special_cols and 
+                              (v['alias'] is None or v['alias'].upper() not in special_cols)}
+        
+        # 두 쿼리의 모든 컬럼 표현식 목록 생성
+        expr1_set = {info['expr'].strip() for info in columns1_filtered.values()}
+        expr2_set = {info['expr'].strip() for info in columns2_filtered.values()}
+        
+        # 정규화된 표현식 매핑 생성 - 공백 차이 등을 무시
+        norm_expr1_map = {}
+        for info in columns1_filtered.values():
+            expr = info['expr'].strip()
+            norm_expr = re.sub(r'\s+', ' ', expr).strip().lower()
+            norm_expr1_map[norm_expr] = expr
+            
+        norm_expr2_map = {}
+        for info in columns2_filtered.values():
+            expr = info['expr'].strip()
+            norm_expr = re.sub(r'\s+', ' ', expr).strip().lower()
+            norm_expr2_map[norm_expr] = expr
+            
+        # 정규화된 표현식 세트
+        norm_expr1_set = set(norm_expr1_map.keys())
+        norm_expr2_set = set(norm_expr2_map.keys())
+        
+        # 정규화된 표현식으로 비교 (별칭과 공백 차이 무시)
+        only_in_query1 = norm_expr1_set - norm_expr2_set
+        only_in_query2 = norm_expr2_set - norm_expr1_set
+        
+        is_equal = True
+        
+        # 첫 번째 쿼리에만 있는 표현식 처리
+        for norm_expr in only_in_query1:
+            orig_expr = norm_expr1_map[norm_expr]
+            # 이 표현식을 포함하는 컬럼 정보 찾기
+            for col, info in columns1_filtered.items():
+                norm_col_expr = re.sub(r'\s+', ' ', info['expr'].strip()).lower()
+                if norm_col_expr == norm_expr:
+                    result.add_difference(col, info['full'], None)
+                    is_equal = False
+                    break
+        
+        # 두 번째 쿼리에만 있는 표현식 처리
+        for norm_expr in only_in_query2:
+            orig_expr = norm_expr2_map[norm_expr]
+            # 이 표현식을 포함하는 컬럼 정보 찾기
+            for col, info in columns2_filtered.items():
+                norm_col_expr = re.sub(r'\s+', ' ', info['expr'].strip()).lower()
+                if norm_col_expr == norm_expr:
+                    result.add_difference(col, None, info['full'])
+                    is_equal = False
+                    break
+        
+        return is_equal
 
     def check_special_columns(self, query: str, direction: str) -> List[str]:
         """
@@ -338,8 +440,20 @@ class QueryParser:
         if not columns:
             return warnings
             
-        # 대소문자 구분 없이 컬럼 비교를 위한 매핑 make
-        columns_upper = {k.upper(): (k, v) for k, v in columns.items()}
+        # 대소문자 구분 없이 컬럼 비교를 위한 매핑 생성
+        if direction == 'send':
+            # SELECT 쿼리의 경우 새 구조에 맞게 처리
+            columns_upper = {}
+            for k, v in columns.items():
+                # 별칭이 있는 경우 별칭을 키로 사용
+                if v['alias'] is not None:
+                    columns_upper[v['alias'].upper()] = (v['alias'], v)
+                else:
+                    # 별칭이 없는 경우 표현식을 키로 사용
+                    columns_upper[k.upper()] = (k, v)
+        else:
+            # INSERT 쿼리는 기존과 동일하게 처리
+            columns_upper = {k.upper(): (k, v) for k, v in columns.items()}
         
         # 필수 특수 컬럼 체크
         for col in self.special_columns[direction]['required']:
@@ -350,10 +464,10 @@ class QueryParser:
         if direction == 'recv':
             for col, expected_value in self.special_columns[direction]['special_values'].items():
                 if col in columns_upper:
-                    actual_value = columns_upper[col][1].upper()
-                    if actual_value != expected_value.upper():
-                        warnings.append(f"특수 컬럼 '{col}'의 값이 '{expected_value}'이(가) 아닙니다. (현재 값: {columns_upper[col][1]})")
-        
+                    col_name, col_value = columns_upper[col]
+                    if col_value != expected_value:
+                        warnings.append(f"특수 컬럼 '{col}'의 값이 기대값과 다릅니다. 기대값: {expected_value}, 실제값: {col_value}")
+                        
         return warnings
 
     def clean_select_query(self, query):
