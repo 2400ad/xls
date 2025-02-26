@@ -239,7 +239,7 @@ class XMLComparator:
             if not file_results:
                 print(f"Warning: No interface files found for IF_ID: {interface_info['interface_id']}")
                 return None
-                
+            
             # 결과 초기화
             comparisons = {
                 'send': None,
@@ -465,13 +465,17 @@ class XMLComparator:
         if not bw_queries:
             bw_queries = {'send': '', 'recv': ''}
         
-        # 시트 이름 생성 (일련번호_인터페이스ID)
-        sheet_name = f"{index:02d}_{interface_info['interface_id']}"
-        if len(sheet_name) > 31:  # Excel 시트명 최대 길이 제한
+        # 시트 이름 생성 (인터페이스 이름)
+        sheet_name = interface_info['interface_name']
+        if not sheet_name:
+            sheet_name = f"인터페이스_{index}"
+            
+        # 이름이 너무 길면 잘라냄 (Excel 시트명 최대 길이는 31자)
+        if len(sheet_name) > 31:
             sheet_name = sheet_name[:31]
         
         # 시트 생성
-        sheet = self.workbook.create_sheet(title=sheet_name)
+        sheet = self.output_wb.create_sheet(title=sheet_name)
         
         # 스타일 정의
         header_fill = PatternFill(start_color="CCCCFF", end_color="CCCCFF", fill_type="solid")
@@ -500,7 +504,7 @@ class XMLComparator:
         for col, header in enumerate(headers, 1):
             cell = sheet.cell(row=row, column=col, value=header)
             cell.font = Font(bold=True)
-            cell.fill = header_fill
+            cell.fill = subheader_fill
             cell.alignment = align_center
             cell.border = border
             sheet.column_dimensions[get_column_letter(col)].width = 20
@@ -508,7 +512,7 @@ class XMLComparator:
         # 3. 인터페이스 정보 값
         row += 1
         
-        # 인터페이스 정보 가져오기 (dict 구조에 따라 적절히 처리)
+        # 인터페이스 정보 가져오기
         if_id = interface_info.get('interface_id', '')
         if_name = interface_info.get('interface_name', '')
         
@@ -516,178 +520,129 @@ class XMLComparator:
         recv_system = interface_info.get('recv_system', 'N/A')
         
         send_table = interface_info.get('send_table', '')
-        if not send_table and 'send' in interface_info and 'table_name' in interface_info['send']:
-            send_table = interface_info['send']['table_name']
-            
         recv_table = interface_info.get('recv_table', '')
-        if not recv_table and 'recv' in interface_info and 'table_name' in interface_info['recv']:
-            recv_table = interface_info['recv']['table_name']
         
-        info_values = [if_id, if_name, send_system, recv_system, send_table, recv_table]
+        # DB SID 정보 추출
+        send_sid = interface_info.get('send', {}).get('db_info', {}).get('sid', 'N/A')
+        recv_sid = interface_info.get('recv', {}).get('db_info', {}).get('sid', 'N/A')
         
-        for col, value in enumerate(info_values, 1):
+        values = [if_id, if_name, f"{send_system} ({send_sid})", f"{recv_system} ({recv_sid})", send_table, recv_table]
+        for col, value in enumerate(values, 1):
             cell = sheet.cell(row=row, column=col, value=value)
             cell.alignment = align_left
             cell.border = border
         
-        # 열 너비 설정
-        for col in range(1, 10):
-            sheet.column_dimensions[get_column_letter(col)].width = 15
-        
-        # 송신 쿼리 비교 섹션
+        # 4. 송신 쿼리 비교 섹션
         row += 2
-        sheet[f'A{row}'] = "송신 SELECT 쿼리 비교"
-        sheet[f'A{row}'].font = Font(bold=True)
-        sheet.merge_cells(f'A{row}:I{row}')
-        sheet[f'A{row}'].fill = header_fill
-        sheet[f'A{row}'].alignment = align_center
+        sheet.merge_cells(f'A{row}:E{row}')
+        cell = sheet.cell(row=row, column=1, value="송신 SELECT 쿼리 비교")
+        cell.font = Font(bold=True)
+        cell.fill = header_fill
+        cell.alignment = align_center
+        cell.border = border
         
+        # 5. 송신 쿼리 비교 헤더
         row += 1
-        # 송신 쿼리 헤더
-        query_headers = ["구분", "SQL 쿼리", "차이점"]
-        for col, header in enumerate(query_headers, 1):
-            cell = sheet.cell(row=row, column=col)
-            cell.value = header
+        headers = ["MQ 송신 쿼리", "BW 송신 쿼리", "비교 결과"]
+        sheet.column_dimensions['A'].width = 40
+        sheet.column_dimensions['B'].width = 40
+        sheet.column_dimensions['C'].width = 30
+        
+        for col, header in enumerate(headers, 1):
+            cell = sheet.cell(row=row, column=col, value=header)
             cell.font = Font(bold=True)
+            cell.fill = subheader_fill
             cell.alignment = align_center
             cell.border = border
-            cell.fill = subheader_fill
         
-        sheet.column_dimensions[get_column_letter(1)].width = 10
-        sheet.column_dimensions[get_column_letter(2)].width = 50
-        sheet.column_dimensions[get_column_letter(3)].width = 30
+        # 6. 송신 쿼리 값
+        row += 1
+        mq_send_query = file_results['send']['query'] if file_results['send']['query'] else '쿼리 없음'
+        bw_send_query = bw_queries['send'] if bw_queries['send'] else '쿼리 없음'
         
         # MQ 송신 쿼리
-        row += 1
-        sheet.cell(row=row, column=1).value = "MQ XML"
-        sheet.cell(row=row, column=1).alignment = align_center
-        sheet.cell(row=row, column=1).border = border
-        
-        send_query = file_results['send']['query'] if file_results and 'send' in file_results and file_results['send'] else ""
-        sheet.cell(row=row, column=2).value = send_query
-        sheet.cell(row=row, column=2).alignment = Alignment(wrap_text=True)
-        sheet.cell(row=row, column=2).border = border
-        sheet.row_dimensions[row].height = 60
+        cell = sheet.cell(row=row, column=1, value=mq_send_query)
+        cell.alignment = Alignment(wrap_text=True, vertical='top')
+        cell.border = border
+        sheet.row_dimensions[row].height = 120
         
         # BW 송신 쿼리
-        row += 1
-        sheet.cell(row=row, column=1).value = "BW XML"
-        sheet.cell(row=row, column=1).alignment = align_center
-        sheet.cell(row=row, column=1).border = border
-        
-        bw_send_query = ""
-        if bw_queries and 'send' in bw_queries and bw_queries['send']:
-            bw_send_query = bw_queries['send']
-        
-        sheet.cell(row=row, column=2).value = bw_send_query
-        sheet.cell(row=row, column=2).alignment = Alignment(wrap_text=True)
-        sheet.cell(row=row, column=2).border = border
-        sheet.row_dimensions[row].height = 60
+        cell = sheet.cell(row=row, column=2, value=bw_send_query)
+        cell.alignment = Alignment(wrap_text=True, vertical='top')
+        cell.border = border
         
         # 송신 쿼리 비교 결과
-        row -= 1  # MQ 쿼리 행으로 돌아가기
+        diff_text = ["비교 결과 없음"]
         if query_comparisons and 'send' in query_comparisons and query_comparisons['send']:
             diff = query_comparisons['send']
-            
-            # 차이점 설명
             diff_text = []
             
             if not diff.is_equal:
                 diff_text.append("※ 차이점 있음")
-                
                 for difference in diff.differences:
                     diff_text.append(f"- 컬럼: {difference['column']}")
-                    diff_text.append(f"  - Excel: {difference['query1_value']}")
-                    diff_text.append(f"  - 파일: {difference['query2_value']}")
+                    diff_text.append(f"  - MQ: {difference['query1_value']}")
+                    diff_text.append(f"  - BW: {difference['query2_value']}")
             else:
                 diff_text.append("※ 차이점 없음")
-            
-            sheet.cell(row=row, column=3).value = "\n".join(diff_text)
-            sheet.cell(row=row, column=3).alignment = Alignment(wrap_text=True, vertical='top')
-            sheet.cell(row=row, column=3).border = border
-            # 두 행에 걸쳐 셀 병합
-            sheet.merge_cells(start_row=row, start_column=3, end_row=row+1, end_column=3)
-        else:
-            sheet.cell(row=row, column=3).value = "※ 비교 결과 없음"
-            sheet.cell(row=row, column=3).alignment = Alignment(wrap_text=True)
-            sheet.cell(row=row, column=3).border = border
-            # 두 행에 걸쳐 셀 병합
-            sheet.merge_cells(start_row=row, start_column=3, end_row=row+1, end_column=3)
         
-        # 수신 쿼리 비교 섹션
-        row += 3
-        sheet[f'A{row}'] = "수신 INSERT 쿼리 비교"
-        sheet[f'A{row}'].font = Font(bold=True)
-        sheet.merge_cells(f'A{row}:I{row}')
-        sheet[f'A{row}'].fill = header_fill
-        sheet[f'A{row}'].alignment = align_center
+        cell = sheet.cell(row=row, column=3, value="\n".join(diff_text))
+        cell.alignment = Alignment(wrap_text=True, vertical='top')
+        cell.border = border
         
+        # 7. 수신 쿼리 비교 섹션
+        row += 2
+        sheet.merge_cells(f'A{row}:E{row}')
+        cell = sheet.cell(row=row, column=1, value="수신 INSERT 쿼리 비교")
+        cell.font = Font(bold=True)
+        cell.fill = header_fill
+        cell.alignment = align_center
+        cell.border = border
+        
+        # 8. 수신 쿼리 비교 헤더
         row += 1
-        # 수신 쿼리 헤더
-        for col, header in enumerate(query_headers, 1):
-            cell = sheet.cell(row=row, column=col)
-            cell.value = header
+        headers = ["MQ 수신 쿼리", "BW 수신 쿼리", "비교 결과"]
+        for col, header in enumerate(headers, 1):
+            cell = sheet.cell(row=row, column=col, value=header)
             cell.font = Font(bold=True)
+            cell.fill = subheader_fill
             cell.alignment = align_center
             cell.border = border
-            cell.fill = subheader_fill
+        
+        # 9. 수신 쿼리 값
+        row += 1
+        mq_recv_query = file_results['recv']['query'] if file_results['recv']['query'] else '쿼리 없음'
+        bw_recv_query = bw_queries['recv'] if bw_queries['recv'] else '쿼리 없음'
         
         # MQ 수신 쿼리
-        row += 1
-        sheet.cell(row=row, column=1).value = "MQ XML"
-        sheet.cell(row=row, column=1).alignment = align_center
-        sheet.cell(row=row, column=1).border = border
-        
-        recv_query = file_results['recv']['query'] if file_results and 'recv' in file_results and file_results['recv'] else ""
-        sheet.cell(row=row, column=2).value = recv_query
-        sheet.cell(row=row, column=2).alignment = Alignment(wrap_text=True)
-        sheet.cell(row=row, column=2).border = border
-        sheet.row_dimensions[row].height = 60
+        cell = sheet.cell(row=row, column=1, value=mq_recv_query)
+        cell.alignment = Alignment(wrap_text=True, vertical='top')
+        cell.border = border
+        sheet.row_dimensions[row].height = 120
         
         # BW 수신 쿼리
-        row += 1
-        sheet.cell(row=row, column=1).value = "BW XML"
-        sheet.cell(row=row, column=1).alignment = align_center
-        sheet.cell(row=row, column=1).border = border
-        
-        bw_recv_query = ""
-        if bw_queries and 'recv' in bw_queries and bw_queries['recv']:
-            bw_recv_query = bw_queries['recv']
-        
-        sheet.cell(row=row, column=2).value = bw_recv_query
-        sheet.cell(row=row, column=2).alignment = Alignment(wrap_text=True)
-        sheet.cell(row=row, column=2).border = border
-        sheet.row_dimensions[row].height = 60
+        cell = sheet.cell(row=row, column=2, value=bw_recv_query)
+        cell.alignment = Alignment(wrap_text=True, vertical='top')
+        cell.border = border
         
         # 수신 쿼리 비교 결과
-        row -= 1  # MQ 쿼리 행으로 돌아가기
+        diff_text = ["비교 결과 없음"]
         if query_comparisons and 'recv' in query_comparisons and query_comparisons['recv']:
             diff = query_comparisons['recv']
-            
-            # 차이점 설명
             diff_text = []
             
             if not diff.is_equal:
                 diff_text.append("※ 차이점 있음")
-                
                 for difference in diff.differences:
                     diff_text.append(f"- 컬럼: {difference['column']}")
-                    diff_text.append(f"  - Excel: {difference['query1_value']}")
-                    diff_text.append(f"  - 파일: {difference['query2_value']}")
+                    diff_text.append(f"  - MQ: {difference['query1_value']}")
+                    diff_text.append(f"  - BW: {difference['query2_value']}")
             else:
                 diff_text.append("※ 차이점 없음")
-            
-            sheet.cell(row=row, column=3).value = "\n".join(diff_text)
-            sheet.cell(row=row, column=3).alignment = Alignment(wrap_text=True, vertical='top')
-            sheet.cell(row=row, column=3).border = border
-            # 두 행에 걸쳐 셀 병합
-            sheet.merge_cells(start_row=row, start_column=3, end_row=row+1, end_column=3)
-        else:
-            sheet.cell(row=row, column=3).value = "※ 비교 결과 없음"
-            sheet.cell(row=row, column=3).alignment = Alignment(wrap_text=True)
-            sheet.cell(row=row, column=3).border = border
-            # 두 행에 걸쳐 셀 병합
-            sheet.merge_cells(start_row=row, start_column=3, end_row=row+1, end_column=3)
+        
+        cell = sheet.cell(row=row, column=3, value="\n".join(diff_text))
+        cell.alignment = Alignment(wrap_text=True, vertical='top')
+        cell.border = border
 
     def process_interface_with_bw(self, start_col: int) -> Optional[Dict]:
         """
