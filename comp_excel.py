@@ -220,115 +220,201 @@ class ExcelManager:
         align_left = Alignment(horizontal='left', vertical='center', wrap_text=True)
         
         # 열 너비 설정
-        for col in range(1, 10):
-            sheet.column_dimensions[get_column_letter(col)].width = 20
+        sheet.column_dimensions[get_column_letter(1)].width = 15
+        sheet.column_dimensions[get_column_letter(2)].width = 20
+        sheet.column_dimensions[get_column_letter(3)].width = 20
+        sheet.column_dimensions[get_column_letter(4)].width = 10
+        sheet.column_dimensions[get_column_letter(5)].width = 30
         
-        # 인터페이스 정보 헤더 설정
-        sheet.cell(row=1, column=1, value="인터페이스 정보").font = Font(bold=True)
-        sheet.merge_cells(start_row=1, start_column=1, end_row=1, end_column=4)
-        sheet.cell(row=1, column=1).fill = header_fill
-        sheet.cell(row=1, column=1).alignment = align_center
+        # 1. 인터페이스 정보 헤더 설정
+        row = 1
+        sheet.cell(row=row, column=1, value="인터페이스 정보").font = Font(bold=True)
+        sheet.merge_cells(start_row=row, start_column=1, end_row=row, end_column=5)
+        sheet.cell(row=row, column=1).fill = header_fill
+        sheet.cell(row=row, column=1).alignment = align_center
         
-        # 인터페이스 정보 내용 채우기
-        sheet.cell(row=2, column=1, value="인터페이스 ID").font = Font(bold=True)
-        sheet.cell(row=2, column=2, value=if_info.get('interface_id', ''))
-        sheet.cell(row=2, column=3, value="인터페이스 명").font = Font(bold=True)
-        sheet.cell(row=2, column=4, value=if_info.get('interface_name', ''))
+        # 인터페이스 ID 및 이름
+        row = 2
+        sheet.cell(row=row, column=1, value="인터페이스 ID").font = Font(bold=True)
+        sheet.cell(row=row, column=2, value=if_info.get('interface_id', ''))
+        sheet.cell(row=row, column=3, value="인터페이스 명").font = Font(bold=True)
+        sheet.cell(row=row, column=4, value=if_info.get('interface_name', ''))
+        sheet.merge_cells(start_row=row, start_column=4, end_row=row, end_column=5)
         
-        # 송신 테이블 정보
-        sheet.cell(row=3, column=1, value="송신 시스템").font = Font(bold=True)
-        sheet.cell(row=3, column=2, value=if_info.get('send_system', 'N/A'))
-        sheet.cell(row=3, column=3, value="송신 테이블").font = Font(bold=True)
-        sheet.cell(row=3, column=4, value=if_info.get('send', {}).get('table_name', 'N/A'))
+        # 송신 시스템 정보
+        row = 3
+        send_db_info = if_info.get('send', {}).get('db_info', {})
+        send_sid = ''
+        if isinstance(send_db_info, dict) and 'sid' in send_db_info:
+            # sid에서 ip:port 형식 제외
+            sid_full = send_db_info['sid']
+            if isinstance(sid_full, str) and ':' in sid_full:
+                # ip:port/sid 형식이면 sid만 추출
+                send_sid = sid_full.split('/')[-1] if '/' in sid_full else sid_full
+            else:
+                send_sid = sid_full
+                
+        sheet.cell(row=row, column=1, value="송신 시스템").font = Font(bold=True)
+        sheet.cell(row=row, column=2, value=send_sid)
+        sheet.cell(row=row, column=3, value="송신 테이블").font = Font(bold=True)
         
-        # 결과 헤더 행 추가
-        row = 5
-        header_row = row
-        headers = [
-            "구분", "MQ 송신 파일", "BW 송신 파일", "MQ 수신 파일", "BW 수신 파일"
-        ]
+        send_owner = if_info.get('send', {}).get('owner', '')
+        send_table = if_info.get('send', {}).get('table_name', '')
+        full_table_name = f"{send_owner}.{send_table}" if send_owner and send_table else send_table
         
-        for col, header in enumerate(headers, 1):
-            cell = sheet.cell(row=header_row, column=col, value=header)
-            cell.font = Font(bold=True)
-            cell.fill = header_fill
-            cell.alignment = align_center
-            cell.border = border
+        sheet.cell(row=row, column=4, value=full_table_name)
+        sheet.merge_cells(start_row=row, start_column=4, end_row=row, end_column=5)
         
-        # 파일 이름 행
-        row += 1
-        if mq_files and bw_files:
-            sheet.cell(row=row, column=1, value="파일명").font = Font(bold=True)
-            sheet.cell(row=row, column=2, value=mq_files.get('send', {}).get('path', 'N/A'))
-            sheet.cell(row=row, column=3, value=bw_files.get('send', 'N/A'))
-            sheet.cell(row=row, column=4, value=mq_files.get('recv', {}).get('path', 'N/A'))
-            sheet.cell(row=row, column=5, value=bw_files.get('recv', 'N/A'))
-            
-            for col in range(1, 6):
-                sheet.cell(row=row, column=col).border = border
-                sheet.cell(row=row, column=col).alignment = align_left
+        # 수신 시스템 정보
+        row = 4
+        recv_db_info = if_info.get('recv', {}).get('db_info', {})
+        recv_sid = ''
+        if isinstance(recv_db_info, dict) and 'sid' in recv_db_info:
+            # sid에서 ip:port 형식 제외
+            sid_full = recv_db_info['sid']
+            if isinstance(sid_full, str) and ':' in sid_full:
+                # ip:port/sid 형식이면 sid만 추출
+                recv_sid = sid_full.split('/')[-1] if '/' in sid_full else sid_full
+            else:
+                recv_sid = sid_full
+                
+        sheet.cell(row=row, column=1, value="수신 시스템").font = Font(bold=True)
+        sheet.cell(row=row, column=2, value=recv_sid)
+        sheet.cell(row=row, column=3, value="수신 테이블").font = Font(bold=True)
         
-        # 쿼리 행
-        row += 1
-        if queries:
-            sheet.cell(row=row, column=1, value="SQL 쿼리").font = Font(bold=True)
-            sheet.cell(row=row, column=2, value=queries.get('mq_send', 'N/A'))
-            sheet.cell(row=row, column=3, value=queries.get('bw_send', 'N/A'))
-            sheet.cell(row=row, column=4, value=queries.get('mq_recv', 'N/A'))
-            sheet.cell(row=row, column=5, value=queries.get('bw_recv', 'N/A'))
-            
-            # 쿼리 셀에 텍스트 줄바꿈 설정
-            for col in range(1, 6):
-                sheet.cell(row=row, column=col).border = border
-                sheet.cell(row=row, column=col).alignment = Alignment(wrap_text=True, vertical='top')
-                sheet.row_dimensions[row].height = 150  # 쿼리 행 높이 설정
+        recv_owner = if_info.get('recv', {}).get('owner', '')
+        recv_table = if_info.get('recv', {}).get('table_name', '')
+        full_recv_table = f"{recv_owner}.{recv_table}" if recv_owner and recv_table else recv_table
         
-        # 비교 결과 행
-        row += 1
-        if comparison_results:
-            sheet.cell(row=row, column=1, value="비교 결과").font = Font(bold=True)
-            
-            # 송신 비교 결과
-            send_result = "일치" if comparison_results.get('send', {}).get('is_equal', False) else "차이"
-            sheet.merge_cells(start_row=row, start_column=2, end_row=row, end_column=3)
-            cell = sheet.cell(row=row, column=2, value=send_result)
-            cell.alignment = align_center
-            
-            # 수신 비교 결과
-            recv_result = "일치" if comparison_results.get('recv', {}).get('is_equal', False) else "차이"
-            sheet.merge_cells(start_row=row, start_column=4, end_row=row, end_column=5)
-            cell = sheet.cell(row=row, column=4, value=recv_result)
-            cell.alignment = align_center
-            
-            # 테두리 적용
-            for col in range(1, 6):
-                if col != 3 and col != 5:  # 병합된 셀 제외
-                    sheet.cell(row=row, column=col).border = border
+        sheet.cell(row=row, column=4, value=full_recv_table)
+        sheet.merge_cells(start_row=row, start_column=4, end_row=row, end_column=5)
         
-        # 비교 결과 상세 행
-        row += 1
-        if comparison_results:
-            sheet.cell(row=row, column=1, value="상세 내역").font = Font(bold=True)
-            
-            # 송신 비교 결과 상세
-            sheet.merge_cells(start_row=row, start_column=2, end_row=row, end_column=3)
-            send_detail = comparison_results.get('send', {}).get('detail', 'N/A')
-            cell = sheet.cell(row=row, column=2, value=send_detail)
-            cell.alignment = Alignment(wrap_text=True, vertical='top')
-            
-            # 수신 비교 결과 상세
-            sheet.merge_cells(start_row=row, start_column=4, end_row=row, end_column=5)
-            recv_detail = comparison_results.get('recv', {}).get('detail', 'N/A')
-            cell = sheet.cell(row=row, column=4, value=recv_detail)
-            cell.alignment = Alignment(wrap_text=True, vertical='top')
-            
-            # 테두리 적용
-            for col in range(1, 6):
-                if col != 3 and col != 5:  # 병합된 셀 제외
-                    sheet.cell(row=row, column=col).border = border
-            
-            # 상세 내역 행 높이 설정
-            sheet.row_dimensions[row].height = 100
+        # 2. 파일 정보 및 쿼리 비교 섹션
+        row = 6
+        
+        # 2.1 송신 파일 정보
+        sheet.cell(row=row, column=1, value="송신 파일명").font = Font(bold=True)
+        sheet.cell(row=row, column=1).fill = header_fill
+        
+        sheet.cell(row=row, column=2, value="MQ 송신 파일").font = Font(bold=True)
+        sheet.cell(row=row, column=2).fill = header_fill
+        sheet.cell(row=row, column=2).alignment = align_center
+        
+        sheet.cell(row=row, column=3, value="BW 송신 파일명").font = Font(bold=True)
+        sheet.cell(row=row, column=3).fill = header_fill
+        sheet.cell(row=row, column=3).alignment = align_center
+        
+        # 송신 파일 정보 입력
+        row = 7
+        sheet.cell(row=row, column=2, value=mq_files.get('send', {}).get('path', 'N/A'))
+        sheet.cell(row=row, column=3, value=bw_files.get('send', 'N/A'))
+        
+        # 2.2 수신 파일 정보
+        row = 8
+        sheet.cell(row=row, column=1, value="수신 파일명").font = Font(bold=True)
+        sheet.cell(row=row, column=1).fill = header_fill
+        
+        sheet.cell(row=row, column=2, value="MQ 수신 파일").font = Font(bold=True)
+        sheet.cell(row=row, column=2).fill = header_fill
+        sheet.cell(row=row, column=2).alignment = align_center
+        
+        sheet.cell(row=row, column=3, value="BW 수신 파일명").font = Font(bold=True)
+        sheet.cell(row=row, column=3).fill = header_fill
+        sheet.cell(row=row, column=3).alignment = align_center
+        
+        # 수신 파일 정보 입력
+        row = 9
+        sheet.cell(row=row, column=2, value=mq_files.get('recv', {}).get('path', 'N/A'))
+        sheet.cell(row=row, column=3, value=bw_files.get('recv', 'N/A'))
+        
+        # 2.3 송신 쿼리 및 비교 결과
+        row = 11
+        sheet.cell(row=row, column=1, value="송신 MQ 쿼리").font = Font(bold=True)
+        sheet.cell(row=row, column=1).fill = header_fill
+        
+        sheet.cell(row=row, column=3, value="송신 BW 쿼리").font = Font(bold=True)
+        sheet.cell(row=row, column=3).fill = header_fill
+        
+        sheet.cell(row=row, column=4, value="비교").font = Font(bold=True)
+        sheet.cell(row=row, column=4).fill = header_fill
+        sheet.cell(row=row, column=4).alignment = align_center
+        
+        sheet.cell(row=row, column=5, value="비교 상세").font = Font(bold=True)
+        sheet.cell(row=row, column=5).fill = header_fill
+        sheet.cell(row=row, column=5).alignment = align_center
+        
+        # 송신 쿼리 및 비교 결과 입력
+        row = 12
+        # MQ 송신 쿼리
+        mq_send_query = queries.get('mq_send', 'N/A')
+        sheet.cell(row=row, column=1, value=mq_send_query)
+        sheet.merge_cells(start_row=row, start_column=1, end_row=row, end_column=2)
+        sheet.cell(row=row, column=1).alignment = Alignment(wrap_text=True, vertical='top')
+        
+        # BW 송신 쿼리
+        bw_send_query = queries.get('bw_send', 'N/A')
+        sheet.cell(row=row, column=3, value=bw_send_query)
+        sheet.cell(row=row, column=3).alignment = Alignment(wrap_text=True, vertical='top')
+        
+        # 송신 비교 결과
+        send_result = "일치" if comparison_results.get('send', {}).get('is_equal', False) else "차이"
+        sheet.cell(row=row, column=4, value=send_result)
+        sheet.cell(row=row, column=4).alignment = align_center
+        
+        # 송신 비교 상세
+        send_detail = comparison_results.get('send', {}).get('detail', 'N/A')
+        sheet.cell(row=row, column=5, value=send_detail)
+        sheet.cell(row=row, column=5).alignment = Alignment(wrap_text=True, vertical='top')
+        
+        # 쿼리 행 높이 설정
+        sheet.row_dimensions[row].height = 150
+        
+        # 2.4 수신 쿼리 및 비교 결과
+        row = 14
+        sheet.cell(row=row, column=1, value="수신 MQ 쿼리").font = Font(bold=True)
+        sheet.cell(row=row, column=1).fill = header_fill
+        
+        sheet.cell(row=row, column=3, value="수신 BW 쿼리").font = Font(bold=True)
+        sheet.cell(row=row, column=3).fill = header_fill
+        
+        sheet.cell(row=row, column=4, value="비교").font = Font(bold=True)
+        sheet.cell(row=row, column=4).fill = header_fill
+        sheet.cell(row=row, column=4).alignment = align_center
+        
+        sheet.cell(row=row, column=5, value="비교 상세").font = Font(bold=True)
+        sheet.cell(row=row, column=5).fill = header_fill
+        sheet.cell(row=row, column=5).alignment = align_center
+        
+        # 수신 쿼리 및 비교 결과 입력
+        row = 15
+        # MQ 수신 쿼리
+        mq_recv_query = queries.get('mq_recv', 'N/A')
+        sheet.cell(row=row, column=1, value=mq_recv_query)
+        sheet.merge_cells(start_row=row, start_column=1, end_row=row, end_column=2)
+        sheet.cell(row=row, column=1).alignment = Alignment(wrap_text=True, vertical='top')
+        
+        # BW 수신 쿼리
+        bw_recv_query = queries.get('bw_recv', 'N/A')
+        sheet.cell(row=row, column=3, value=bw_recv_query)
+        sheet.cell(row=row, column=3).alignment = Alignment(wrap_text=True, vertical='top')
+        
+        # 수신 비교 결과
+        recv_result = "일치" if comparison_results.get('recv', {}).get('is_equal', False) else "차이"
+        sheet.cell(row=row, column=4, value=recv_result)
+        sheet.cell(row=row, column=4).alignment = align_center
+        
+        # 수신 비교 상세
+        recv_detail = comparison_results.get('recv', {}).get('detail', 'N/A')
+        sheet.cell(row=row, column=5, value=recv_detail)
+        sheet.cell(row=row, column=5).alignment = Alignment(wrap_text=True, vertical='top')
+        
+        # 쿼리 행 높이 설정
+        sheet.row_dimensions[row].height = 150
+        
+        # 모든 셀에 테두리 적용
+        for row_cells in sheet.iter_rows(min_row=1, max_row=15, min_col=1, max_col=5):
+            for cell in row_cells:
+                cell.border = border
         
         return sheet
     
@@ -385,8 +471,21 @@ class ExcelManager:
         send_comparison = comparisons.get('send')
         recv_comparison = comparisons.get('recv')
         
-        send_result = '일치' if send_comparison and send_comparison.is_equal else '차이'
-        recv_result = '일치' if recv_comparison and recv_comparison.is_equal else '차이'
+        # 비교 결과가 QueryDifference 객체인 경우 (XMLComparator에서 직접 전달)
+        if hasattr(send_comparison, 'is_equal'):
+            send_result = '일치' if send_comparison.is_equal else '차이'
+        # 비교 결과가 딕셔너리인 경우 (테스트 코드 예시)
+        elif isinstance(send_comparison, dict) and 'is_equal' in send_comparison:
+            send_result = '일치' if send_comparison['is_equal'] else '차이'
+        else:
+            send_result = '비교불가'
+            
+        if hasattr(recv_comparison, 'is_equal'):
+            recv_result = '일치' if recv_comparison.is_equal else '차이'
+        elif isinstance(recv_comparison, dict) and 'is_equal' in recv_comparison:
+            recv_result = '일치' if recv_comparison['is_equal'] else '차이'
+        else:
+            recv_result = '비교불가'
         
         # 요약 데이터 구성
         summary_data = [
@@ -409,6 +508,15 @@ class ExcelManager:
                 cell.alignment = align_left
             else:
                 cell.alignment = align_center
+                
+            # 비교 결과에 따른 색상 설정
+            if col in [6, 9]:  # 비교 결과 열
+                if value == '일치':
+                    cell.fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
+                elif value == '차이':
+                    cell.fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+                elif value == '비교불가':
+                    cell.fill = PatternFill(start_color="DDDDDD", end_color="DDDDDD", fill_type="solid")
     
     def close(self):
         """
@@ -429,44 +537,100 @@ def main():
     sheet = excel_manager.initialize_excel_output()
     
     # 샘플 데이터로 요약 시트 업데이트
-    sample_data = {"interface_info": {"interface_id": "IF001", "interface_name": "테스트 인터페이스", "send": {"table_name": "TEST_TABLE"}}, 
-                   "file_results": {"send": {"path": "test.SND.xml"}, "recv": {"path": "test.RCV.xml"}}, 
-                   "bw_files": ["test.xml", "test.xml"], 
-                   "comparisons": {"send": {"is_equal": True}, "recv": {"is_equal": False}}}
+    sample_data = {
+        "interface_info": {
+            "interface_id": "IF001", 
+            "interface_name": "테스트 인터페이스", 
+            "send": {
+                "owner": "OWNER",
+                "table_name": "TEST_TABLE",
+                "db_info": {
+                    "sid": "10.10.10.10:1521/DEVDB",
+                    "system": "개발시스템"
+                }
+            },
+            "recv": {
+                "owner": "OWNER",
+                "table_name": "TEST_RCV_TABLE",
+                "db_info": {
+                    "sid": "10.10.10.20:1521/PRODDB",
+                    "system": "운영시스템"
+                }
+            }
+        }, 
+        "file_results": {
+            "send": {"path": "test.SND.xml", "query": "SELECT * FROM OWNER.TEST_TABLE"}, 
+            "recv": {"path": "test.RCV.xml", "query": "SELECT * FROM OWNER.TEST_RCV_TABLE"}
+        }, 
+        "bw_files": ["bw_mapping.xml", "bw_mapping2.xml"], 
+        "bw_queries": {
+            "send": "INSERT INTO OWNER.TEST_TABLE VALUES (:1, :2, :3)",
+            "recv": "INSERT INTO OWNER.TEST_RCV_TABLE VALUES (:1, :2, :3)"
+        },
+        "comparisons": {
+            "send": {"is_equal": True, "detail": "일치 - 테이블과 칼럼이 모두 동일합니다."}, 
+            "recv": {"is_equal": False, "detail": "차이 - MQ 쿼리는 모든 컬럼을 선택하지만 BW 쿼리는 특정 컬럼만 선택합니다."}
+        }
+    }
     excel_manager.update_summary_sheet(sample_data, 2)
     
     # 샘플 인터페이스 시트 생성
     if_info = {
         'interface_id': 'IF001',
-        'interface_name': '테스트 인터페이스'
+        'interface_name': '테스트 인터페이스',
+        'send': {
+            'owner': 'OWNER',
+            'table_name': 'TEST_TABLE',
+            'db_info': {
+                'sid': '10.10.10.10:1521/DEVDB',
+                'system': '개발시스템'
+            }
+        },
+        'recv': {
+            'owner': 'OWNER',
+            'table_name': 'TEST_RCV_TABLE',
+            'db_info': {
+                'sid': '10.10.10.20:1521/PRODDB',
+                'system': '운영시스템'
+            }
+        }
     }
     
     mq_files = {
-        'send': {'path': 'test.SND.xml'},
-        'recv': {'path': 'test.RCV.xml'}
+        'send': {'path': 'test.SND.xml', 'query': 'SELECT * FROM OWNER.TEST_TABLE WHERE 1=1 AND col1 = :value1 AND col2 = :value2'},
+        'recv': {'path': 'test.RCV.xml', 'query': 'SELECT * FROM OWNER.TEST_RCV_TABLE WHERE status = \'Y\''}
     }
     
     bw_files = {
-        'send': 'test.xml',
-        'recv': 'test.xml'
+        'send': 'bw_mapping.xml',
+        'recv': 'bw_mapping2.xml'
     }
     
     queries = {
-        'mq_send': 'SELECT * FROM TEST_TABLE',
-        'bw_send': 'INSERT INTO TEST_TABLE',
-        'mq_recv': 'SELECT * FROM TEST_TABLE',
-        'bw_recv': 'INSERT INTO TEST_TABLE'
+        'mq_send': 'SELECT * FROM OWNER.TEST_TABLE WHERE 1=1 AND col1 = :value1 AND col2 = :value2',
+        'bw_send': 'INSERT INTO OWNER.TEST_TABLE (col1, col2, col3) VALUES (:1, :2, :3)',
+        'mq_recv': 'SELECT * FROM OWNER.TEST_RCV_TABLE WHERE status = \'Y\'',
+        'bw_recv': 'INSERT INTO OWNER.TEST_RCV_TABLE (col1, col2, status) VALUES (:1, :2, \'Y\')'
     }
     
     comparison_results = {
-        'send': {'is_equal': True, 'detail': '일치'},
-        'recv': {'is_equal': False, 'detail': '차이'}
+        'send': {
+            'is_equal': True, 
+            'detail': '일치 - 테이블과 칼럼이 모두 동일합니다.'
+        },
+        'recv': {
+            'is_equal': False, 
+            'detail': '차이 - MQ 쿼리는 모든 컬럼을 선택하지만 BW 쿼리는 특정 컬럼만 선택합니다.\n- MQ: status = \'Y\'\n- BW: VALUES 값에 직접 \'Y\' 사용'
+        }
     }
     
     excel_manager.create_interface_sheet(if_info, mq_files, bw_files, queries, comparison_results)
     
-    # 파일 저장
-    excel_manager.save_excel_output('test_output.xlsx')
+    # 결과 저장
+    output_path = 'comp_mq_bw_sample.xlsx'
+    excel_manager.save_excel_output(output_path)
+    print(f"결과가 {output_path}에 저장되었습니다.")
+    
     excel_manager.close()
 
 

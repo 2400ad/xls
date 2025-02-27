@@ -462,55 +462,58 @@ class XMLComparator:
         
     def create_interface_sheet(self, if_info, file_results, query_comparisons, bw_queries=None, bw_files=None):
         """
-        인터페이스 정보를 담은 시트를 생성합니다.
+        인터페이스 정보와 비교 결과를 포함하는 엑셀 시트를 생성합니다.
         
         Args:
             if_info (dict): 인터페이스 정보
-            file_results (dict): 파일 처리 결과
-            query_comparisons (dict): 쿼리 비교 결과
-            bw_queries (dict, optional): BW 쿼리 정보
-            bw_files (list, optional): BW 파일 정보
+            file_results (dict): MQ 파일 결과 (송신/수신)
+            query_comparisons (dict): 쿼리 비교 결과 (송신/수신)
+            bw_queries (dict, optional): BW 쿼리 정보. Defaults to None.
+            bw_files (list, optional): BW 매핑 파일 목록. Defaults to None.
         """
-        # MQ 파일 정보 구성
-        mq_files = {
-            'send': {'path': file_results['send']['path']},
-            'recv': {'path': file_results['recv']['path']}
+        # 기본값 설정
+        bw_queries = bw_queries or {'send': '', 'recv': ''}
+        bw_files = bw_files or []
+        
+        # 인터페이스 ID와 이름 확인
+        if 'interface_id' not in if_info or not if_info['interface_id']:
+            print("인터페이스 ID가 없습니다.")
+            return
+            
+        # BW 파일 매핑
+        bw_files_dict = {
+            'send': bw_files[0] if bw_files and len(bw_files) > 0 else 'N/A',
+            'recv': bw_files[1] if bw_files and len(bw_files) > 1 else 'N/A'
         }
         
-        # BW 파일 정보 구성
-        bw_files_dict = {
-            'send': bw_files[0] if bw_files and len(bw_files) > 0 else '매핑파일없음',
-            'recv': bw_files[1] if bw_files and len(bw_files) > 1 else '매핑파일없음'
+        # MQ 파일 정보
+        mq_files = {
+            'send': file_results.get('send', {}),
+            'recv': file_results.get('recv', {})
         }
         
         # 쿼리 정보 구성
         queries = {
-            'mq_send': file_results['send']['query'],
-            'mq_recv': file_results['recv']['query'],
-            'bw_send': bw_queries['send'] if bw_queries else 'N/A',
-            'bw_recv': bw_queries['recv'] if bw_queries else 'N/A'
+            'mq_send': file_results.get('send', {}).get('query', 'N/A'),
+            'bw_send': bw_queries.get('send', 'N/A'),
+            'mq_recv': file_results.get('recv', {}).get('query', 'N/A'),
+            'bw_recv': bw_queries.get('recv', 'N/A')
         }
         
         # 비교 결과 구성
         comparison_results = {
             'send': {
-                'is_equal': query_comparisons['send'].is_equal if query_comparisons['send'] else False,
-                'detail': query_comparisons['send'].detail if query_comparisons['send'] else 'N/A'
+                'is_equal': query_comparisons.get('send', QueryDifference()).is_equal,
+                'detail': query_comparisons.get('send', QueryDifference()).detail
             },
             'recv': {
-                'is_equal': query_comparisons['recv'].is_equal if query_comparisons['recv'] else False,
-                'detail': query_comparisons['recv'].detail if query_comparisons['recv'] else 'N/A'
+                'is_equal': query_comparisons.get('recv', QueryDifference()).is_equal,
+                'detail': query_comparisons.get('recv', QueryDifference()).detail
             }
         }
         
-        # ExcelManager를 사용하여 인터페이스 시트 생성
-        self.excel_manager.create_interface_sheet(
-            if_info, 
-            mq_files, 
-            bw_files_dict, 
-            queries, 
-            comparison_results
-        )
+        # 인터페이스 시트 생성
+        self.excel_manager.create_interface_sheet(if_info, mq_files, bw_files_dict, queries, comparison_results)
         
     def process_interface_with_bw(self, start_col: int, interface_info: Dict) -> Optional[Dict]:
         """
