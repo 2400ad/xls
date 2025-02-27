@@ -378,9 +378,23 @@ class QueryParser:
                 elif col not in columns2_filtered:
                     result.add_difference(col, columns1_filtered[col], None)
                     is_equal = False
-                elif columns1_filtered[col] != columns2_filtered[col]:
-                    result.add_difference(col, columns1_filtered[col], columns2_filtered[col])
-                    is_equal = False
+                else:
+                    # 값 비교 시 to_char 함수의 포맷 차이를 무시
+                    val1 = columns1_filtered[col]
+                    val2 = columns2_filtered[col]
+                    
+                    # to_char 함수를 포함하는 값이면 정규화 적용
+                    if 'to_char(' in val1.lower() or 'to_char(' in val2.lower():
+                        norm_val1 = self._normalize_tochar_format(val1)
+                        norm_val2 = self._normalize_tochar_format(val2)
+                        if norm_val1 != norm_val2:
+                            result.add_difference(col, val1, val2)
+                            is_equal = False
+                    else:
+                        # 일반 값은 그대로 비교
+                        if val1 != val2:
+                            result.add_difference(col, val1, val2)
+                            is_equal = False
             
             result.is_equal = is_equal
                 

@@ -26,6 +26,20 @@ def test_alias_handling():
     print(f"테스트 2 (다른 to_char 포맷): {'성공' if result.is_equal else '실패'}")
     if not result.is_equal:
         print(result)
+    
+    # 테스트 3: INSERT 쿼리에서 to_char format이 다른 경우
+    query1 = """
+    INSERT INTO TB_TEST (COL1, COL2, DATE_COL) 
+    VALUES ('VAL1', 'VAL2', to_char(sysdate, 'YYYYMMDDHH24MISS'))
+    """
+    query2 = """
+    INSERT INTO TB_TEST (COL1, COL2, DATE_COL) 
+    VALUES ('VAL1', 'VAL2', to_char(sysdate, 'YYYY-MM-DD HH24:MI:SS'))
+    """
+    result = parser.compare_queries(query1, query2)
+    print(f"테스트 3 (INSERT 쿼리 다른 to_char 포맷): {'성공' if result.is_equal else '실패'}")
+    if not result.is_equal:
+        print(result)
 
     print("\n모든 테스트가 완료되었습니다.")
 
