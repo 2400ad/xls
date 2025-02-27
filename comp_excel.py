@@ -101,33 +101,21 @@ class ExcelManager:
         
         self.output_path = ''
     
-    def initialize_excel_output(self, summary_sheet_name='요약'):
+    def initialize_excel_output(self):
         """
         결과를 저장할 새 엑셀 파일 초기화
         
-        Args:
-            summary_sheet_name (str): 요약 시트 이름
+        Returns:
+            openpyxl.worksheet.worksheet.Worksheet: 생성된 시트 객체
         """
-        # 기본 시트의 이름을 변경
-        if 'Sheet' in self.workbook.sheetnames:
-            sheet = self.workbook['Sheet']
-            sheet.title = summary_sheet_name
-        elif summary_sheet_name not in self.workbook.sheetnames:
-            sheet = self.workbook.create_sheet(summary_sheet_name)
-            
-        # 요약 시트 헤더 초기화
-        self._initialize_summary_sheet(self.workbook[summary_sheet_name])
+        # 기존 시트가 있으면 모두 삭제
+        for sheet_name in self.workbook.sheetnames:
+            del self.workbook[sheet_name]
         
-        return self.workbook[summary_sheet_name]
-    
-    def _initialize_summary_sheet(self, sheet):
-        """
-        요약 시트의 헤더를 초기화합니다.
+        # 요약 시트 생성
+        sheet = self.workbook.create_sheet("요약")
         
-        Args:
-            sheet: 요약 시트 객체
-        """
-        # 스타일 정의
+        # 제목 행 스타일 정의
         header_fill = PatternFill(start_color="CCCCFF", end_color="CCCCFF", fill_type="solid")
         border = Border(
             left=Side(style='thin'),
@@ -140,18 +128,19 @@ class ExcelManager:
         wrap_text_top = Alignment(wrap_text=True, vertical='top')
         
         # 열 너비 설정
-        sheet.column_dimensions['A'].width = 15  # 인터페이스 ID
-        sheet.column_dimensions['B'].width = 15  # 인터페이스 명
-        sheet.column_dimensions['C'].width = 15  # 송신 테이블
-        sheet.column_dimensions['D'].width = 15  # MQ 송신 파일
-        sheet.column_dimensions['E'].width = 15  # BW 송신 파일
-        sheet.column_dimensions['F'].width = 15  # 송신 비교 결과
-        sheet.column_dimensions['G'].width = 15  # MQ 수신 파일
-        sheet.column_dimensions['H'].width = 15  # BW 수신 파일
-        sheet.column_dimensions['I'].width = 15  # 수신 비교 결과
+        sheet.column_dimensions['A'].width = 5   # 일련번호
+        sheet.column_dimensions['B'].width = 15  # 인터페이스 ID
+        sheet.column_dimensions['C'].width = 15  # 인터페이스 명
+        sheet.column_dimensions['D'].width = 15  # 송신 테이블
+        sheet.column_dimensions['E'].width = 15  # MQ 송신 파일
+        sheet.column_dimensions['F'].width = 15  # BW 송신 파일
+        sheet.column_dimensions['G'].width = 15  # 송신 비교 결과
+        sheet.column_dimensions['H'].width = 15  # MQ 수신 파일
+        sheet.column_dimensions['I'].width = 15  # BW 수신 파일
+        sheet.column_dimensions['J'].width = 15  # 수신 비교 결과
         
         # 헤더 행 생성
-        headers = ["인터페이스 ID", "인터페이스 명", "송신 테이블", "MQ 송신 파일", "BW 송신 파일", "송신 비교 결과", 
+        headers = ["번호", "인터페이스 ID", "인터페이스 명", "송신 테이블", "MQ 송신 파일", "BW 송신 파일", "송신 비교 결과", 
                   "MQ 수신 파일", "BW 수신 파일", "수신 비교 결과"]
         
         for col_idx, header in enumerate(headers, 1):
@@ -160,6 +149,77 @@ class ExcelManager:
             cell.fill = header_fill
             cell.alignment = align_center
             cell.border = border
+        
+        return sheet
+    
+    def update_summary_sheet(self, data, row=None):
+        """
+        요약 시트에 인터페이스 정보 추가
+        
+        Args:
+            data (dict): 인터페이스 데이터
+            row (int, optional): 추가할 행 번호 (None이면 마지막 행 다음에 추가)
+        """
+        sheet = self.workbook["요약"] if "요약" in self.workbook.sheetnames else self.workbook.active
+        
+        # 추가할 행 번호 결정
+        if row is None:
+            # 마지막 행 다음에 추가
+            row = 2
+            for r in range(2, sheet.max_row + 2):
+                if sheet.cell(row=r, column=2).value is None:
+                    row = r
+                    break
+        
+        # 일련번호 계산
+        seq_num = row - 1
+        seq_num_formatted = f"{seq_num:02d}"  # 01, 02, ... 형식으로 포맷팅
+        
+        # 인터페이스 정보
+        interface_info = data.get("interface_info", {})
+        file_results = data.get("file_results", {})
+        bw_files = data.get("bw_files", [])
+        comparisons = data.get("comparisons", {})
+        
+        # 값 설정
+        sheet.cell(row=row, column=1, value=seq_num_formatted)  # 일련번호
+        sheet.cell(row=row, column=2, value=interface_info.get("interface_id", ""))
+        sheet.cell(row=row, column=3, value=interface_info.get("interface_name", ""))
+        sheet.cell(row=row, column=4, value=f"{interface_info.get('send', {}).get('owner', '')}.{interface_info.get('send', {}).get('table_name', '')}")
+        
+        # MQ 파일 정보
+        sheet.cell(row=row, column=5, value=file_results.get("send", {}).get("path", ""))
+        
+        # BW 파일 정보
+        if isinstance(bw_files, list) and len(bw_files) > 0:
+            sheet.cell(row=row, column=6, value=bw_files[0])
+        elif isinstance(bw_files, dict):
+            sheet.cell(row=row, column=6, value=bw_files.get("send", ""))
+        
+        # 비교 결과 - 송신
+        send_comparison = comparisons.get("send", {})
+        if isinstance(send_comparison, dict):
+            is_equal = send_comparison.get("is_equal", False)
+            sheet.cell(row=row, column=7, value="일치" if is_equal else "차이")
+        else:
+            sheet.cell(row=row, column=7, value="비교불가")
+        
+        # MQ 수신 파일
+        sheet.cell(row=row, column=8, value=file_results.get("recv", {}).get("path", ""))
+        
+        # BW 수신 파일
+        if isinstance(bw_files, list) and len(bw_files) > 1:
+            sheet.cell(row=row, column=9, value=bw_files[1])
+        elif isinstance(bw_files, dict):
+            sheet.cell(row=row, column=9, value=bw_files.get("recv", ""))
+        
+        # 비교 결과 - 수신
+        recv_comparison = comparisons.get("recv", {})
+        if isinstance(recv_comparison, dict):
+            is_equal = recv_comparison.get("is_equal", False)
+            sheet.cell(row=row, column=10, value="일치" if is_equal else "차이")
+        else:
+            sheet.cell(row=row, column=10, value="비교불가")
     
     def save_excel_output(self, output_path):
         """
@@ -201,14 +261,27 @@ class ExcelManager:
             queries = {}
         if comparison_results is None:
             comparison_results = {}
-            
+        
         # 시트 이름 생성 (인터페이스 이름 또는 ID)
         sheet_name = if_info.get('interface_name', '') or if_info.get('interface_id', '')
+        
+        # 일련번호 찾기
+        seq_num = '01'  # 기본값
+        if "요약" in self.workbook.sheetnames:
+            summary_sheet = self.workbook["요약"]
+            for row in range(2, summary_sheet.max_row + 1):
+                interface_id = summary_sheet.cell(row=row, column=2).value
+                if interface_id == if_info.get('interface_id', ''):
+                    seq_num = summary_sheet.cell(row=row, column=1).value
+                    break
+        
+        # 시트 이름 앞에 일련번호 추가
+        sheet_name = f"{seq_num}_{sheet_name}"
         
         # 시트 이름이 30자를 초과하면 자르기 (Excel 시트 이름 제한)
         if len(sheet_name) > 30:
             sheet_name = sheet_name[:27] + '...'
-            
+        
         # 시트 이름이 중복되는 경우 처리
         base_name = sheet_name
         counter = 1
@@ -469,108 +542,6 @@ class ExcelManager:
         
         return sheet
     
-    def update_summary_sheet(self, result, row, sheet_name='요약'):
-        """
-        요약 시트에 결과를 추가합니다.
-        
-        Args:
-            result (dict): 인터페이스 처리 결과
-            row (int): 요약 시트의 행 번호
-            sheet_name (str): 요약 시트 이름
-        """
-        # 요약 시트 가져오기
-        if sheet_name not in self.workbook.sheetnames:
-            self.initialize_excel_output(sheet_name)
-        
-        summary_sheet = self.workbook[sheet_name]
-        
-        # 스타일 정의
-        border = Border(
-            left=Side(style='thin'),
-            right=Side(style='thin'),
-            top=Side(style='thin'),
-            bottom=Side(style='thin')
-        )
-        align_center = Alignment(horizontal='center', vertical='center')
-        align_left = Alignment(horizontal='left', vertical='center')
-        wrap_text_top = Alignment(wrap_text=True, vertical='top')
-        
-        # 인터페이스 정보
-        interface_info = result.get('interface_info', {})
-        interface_id = interface_info.get('interface_id', '')
-        interface_name = interface_info.get('interface_name', '')
-        send_table = interface_info.get('send', {}).get('table_name', '')
-        
-        # 파일 정보
-        file_results = result.get('file_results', {})
-        mq_send_file = file_results.get('send', {}).get('path', 'N/A')
-        mq_recv_file = file_results.get('recv', {}).get('path', 'N/A')
-        
-        # BW 파일 및 쿼리 정보
-        bw_files = result.get('bw_files', [])
-        bw_queries = result.get('bw_queries', {'send': '', 'recv': ''})
-        
-        bw_send_file = "매핑파일없음"
-        if bw_files and len(bw_files) > 0:
-            bw_send_file = bw_files[0]
-            
-        bw_recv_file = "매핑파일없음"
-        if bw_files and len(bw_files) > 1:
-            bw_recv_file = bw_files[1]
-        
-        # 비교 결과
-        comparisons = result.get('comparisons', {'send': None, 'recv': None})
-        send_comparison = comparisons.get('send')
-        recv_comparison = comparisons.get('recv')
-        
-        # 비교 결과가 QueryDifference 객체인 경우 (XMLComparator에서 직접 전달)
-        if hasattr(send_comparison, 'is_equal'):
-            send_result = '일치' if send_comparison.is_equal else '차이'
-        # 비교 결과가 딕셔너리인 경우 (테스트 코드 예시)
-        elif isinstance(send_comparison, dict) and 'is_equal' in send_comparison:
-            send_result = '일치' if send_comparison['is_equal'] else '차이'
-        else:
-            send_result = '비교불가'
-            
-        if hasattr(recv_comparison, 'is_equal'):
-            recv_result = '일치' if recv_comparison.is_equal else '차이'
-        elif isinstance(recv_comparison, dict) and 'is_equal' in recv_comparison:
-            recv_result = '일치' if recv_comparison['is_equal'] else '차이'
-        else:
-            recv_result = '비교불가'
-        
-        # 요약 데이터 구성
-        summary_data = [
-            interface_id,
-            interface_name,
-            send_table,
-            mq_send_file,
-            bw_send_file,
-            send_result,
-            mq_recv_file,
-            bw_recv_file,
-            recv_result
-        ]
-        
-        # 데이터 채우기
-        for col, value in enumerate(summary_data, 1):
-            cell = summary_sheet.cell(row=row, column=col, value=value)
-            cell.border = border
-            cell.font = Font(size=10)
-            if col in [1, 2, 3]:
-                cell.alignment = align_left
-            else:
-                cell.alignment = align_center
-                
-            # 비교 결과에 따른 색상 설정
-            if col in [6, 9]:  # 비교 결과 열
-                if value == '일치':
-                    cell.fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
-                elif value == '차이':
-                    cell.fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
-                elif value == '비교불가':
-                    cell.fill = PatternFill(start_color="DDDDDD", end_color="DDDDDD", fill_type="solid")
-    
     def close(self):
         """
         리소스 정리
@@ -625,7 +596,7 @@ def main():
             "recv": {"is_equal": False, "detail": "차이 - MQ 쿼리는 모든 컬럼을 선택하지만 BW 쿼리는 특정 컬럼만 선택합니다."}
         }
     }
-    excel_manager.update_summary_sheet(sample_data, 2)
+    excel_manager.update_summary_sheet(sample_data)
     
     # 샘플 인터페이스 시트 생성
     if_info = {
