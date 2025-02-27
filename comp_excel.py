@@ -200,6 +200,9 @@ class ExcelManager:
         cell = sheet.cell(row=row, column=2, value=interface_info.get("interface_id", ""))
         cell.font = font_normal
         
+        # 인터페이스 ID와 일련번호 매핑 저장 (인터페이스 ID 설정 직후에 추가)
+        self.interface_id_map[interface_info.get("interface_id", "")] = seq_num_formatted
+        
         cell = sheet.cell(row=row, column=3, value=interface_info.get("interface_name", ""))
         cell.font = font_normal
         
@@ -342,9 +345,6 @@ class ExcelManager:
             cell.fill = PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid")  # 노란색
         cell.font = font_normal
 
-        # 인터페이스 ID와 일련번호 매핑 저장
-        self.interface_id_map[interface_info.get("interface_id", "")] = seq_num_formatted
-
     def save_excel_output(self, output_path):
         """
         처리된 결과를 엑셀 파일로 저장
@@ -392,7 +392,10 @@ class ExcelManager:
         sheet_name = if_info.get('interface_name', '') or if_info.get('interface_id', '')
         
         # 일련번호 찾기
-        seq_num = self.interface_id_map.get(if_info.get('interface_id', ''))
+        interface_id = if_info.get('interface_id', '')
+        seq_num = self.interface_id_map.get(interface_id, '')
+        print(f"[디버깅] 인터페이스 시트 생성 - ID: {interface_id}, 일련번호: {seq_num}")
+        print(f"[디버깅] 현재 매핑 정보: {self.interface_id_map}")
         
         # 시트 이름 앞에 일련번호를 붙임 (있는 경우에만)
         if seq_num:
