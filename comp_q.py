@@ -21,14 +21,9 @@ class QueryDifference:
 
     def __str__(self) -> str:
         if self.is_equal:
-            return "쿼리가 일치합니다."
+            return "일치"
         
-        result = ["쿼리가 일치하지 않습니다:"]
-        for diff in self.differences:
-            result.append(f"  컬럼: {diff['column']}")
-            result.append(f"    - Excel: {diff['query1_value']}")
-            result.append(f"    - 파일: {diff['query2_value']}")
-        return "\n".join(result)
+        return "불일치"
 
 class QueryParser:
     # 특수 컬럼 정의를 클래스 변수로 변경

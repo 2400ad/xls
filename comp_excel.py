@@ -214,17 +214,18 @@ class ExcelManager:
         if isinstance(send_comparison, dict):
             # 문자열 결과를 확인하여 처리
             if isinstance(send_comparison, str):
-                # 문장형 결과 확인
-                comp_result = "쿼리가 일치합니다." if "일치" in send_comparison else "쿼리가 일치하지 않습니다."
-                cell = sheet.cell(row=row, column=7, value=comp_result)
+                # "일치" 또는 "불일치" 문자열 그대로 사용
+                cell = sheet.cell(row=row, column=7, value=send_comparison)
             elif "is_equal" in send_comparison:
                 is_equal = send_comparison.get("is_equal", False)
-                cell = sheet.cell(row=row, column=7, value="쿼리가 일치합니다." if is_equal else "쿼리가 일치하지 않습니다.")
+                cell = sheet.cell(row=row, column=7, value="일치" if is_equal else "불일치")
             # 또는 "detail" 필드가 있을 경우
             elif "detail" in send_comparison:
                 detail = send_comparison.get("detail", "")
-                comp_result = "쿼리가 일치합니다." if "일치" in detail else "쿼리가 일치하지 않습니다."
-                cell = sheet.cell(row=row, column=7, value=comp_result)
+                if detail == "일치" or detail == "불일치":
+                    cell = sheet.cell(row=row, column=7, value=detail)
+                else:
+                    cell = sheet.cell(row=row, column=7, value="불일치")
             else:
                 cell = sheet.cell(row=row, column=7, value="비교불가")
         else:
@@ -247,17 +248,18 @@ class ExcelManager:
         if isinstance(recv_comparison, dict):
             # 문자열 결과를 확인하여 처리
             if isinstance(recv_comparison, str):
-                # 문장형 결과 확인
-                comp_result = "쿼리가 일치합니다." if "일치" in recv_comparison else "쿼리가 일치하지 않습니다."
-                cell = sheet.cell(row=row, column=10, value=comp_result)
+                # "일치" 또는 "불일치" 문자열 그대로 사용
+                cell = sheet.cell(row=row, column=10, value=recv_comparison)
             elif "is_equal" in recv_comparison:
                 is_equal = recv_comparison.get("is_equal", False)
-                cell = sheet.cell(row=row, column=10, value="쿼리가 일치합니다." if is_equal else "쿼리가 일치하지 않습니다.")
+                cell = sheet.cell(row=row, column=10, value="일치" if is_equal else "불일치")
             # 또는 "detail" 필드가 있을 경우
             elif "detail" in recv_comparison:
                 detail = recv_comparison.get("detail", "")
-                comp_result = "쿼리가 일치합니다." if "일치" in detail else "쿼리가 일치하지 않습니다."
-                cell = sheet.cell(row=row, column=10, value=comp_result)
+                if detail == "일치" or detail == "불일치":
+                    cell = sheet.cell(row=row, column=10, value=detail)
+                else:
+                    cell = sheet.cell(row=row, column=10, value="불일치")
             else:
                 cell = sheet.cell(row=row, column=10, value="비교불가")
         else:
@@ -511,7 +513,7 @@ class ExcelManager:
                 is_send_equal = comparison_results['send'].is_equal
                 send_detail = getattr(comparison_results['send'], 'detail', 'N/A')
                 
-        sheet.cell(row=row, column=5, value='쿼리가 일치합니다.' if is_send_equal else '쿼리가 일치하지 않습니다.')
+        sheet.cell(row=row, column=5, value='일치' if is_send_equal else '불일치')
         sheet.cell(row=row, column=5).alignment = align_center
         sheet.cell(row=row, column=6, value=send_detail)
         sheet.cell(row=row, column=6).alignment = wrap_text_top
@@ -567,7 +569,7 @@ class ExcelManager:
                 is_recv_equal = comparison_results['recv'].is_equal
                 recv_detail = getattr(comparison_results['recv'], 'detail', 'N/A')
                 
-        sheet.cell(row=row, column=5, value='쿼리가 일치합니다.' if is_recv_equal else '쿼리가 일치하지 않습니다.')
+        sheet.cell(row=row, column=5, value='일치' if is_recv_equal else '불일치')
         sheet.cell(row=row, column=5).alignment = align_center
         sheet.cell(row=row, column=6, value=recv_detail)
         sheet.cell(row=row, column=6).alignment = wrap_text_top
@@ -637,8 +639,8 @@ def main():
             "recv": "INSERT INTO OWNER.TEST_RCV_TABLE VALUES (:1, :2, :3)"
         },
         "comparisons": {
-            "send": {"is_equal": True, "detail": "쿼리가 일치합니다."}, 
-            "recv": {"is_equal": False, "detail": "쿼리가 일치하지 않습니다."}
+            "send": {"is_equal": True, "detail": "일치"}, 
+            "recv": {"is_equal": False, "detail": "불일치"}
         }
     }
     excel_manager.update_summary_sheet(sample_data)
@@ -685,11 +687,11 @@ def main():
     comparison_results = {
         'send': {
             'is_equal': True, 
-            'detail': '쿼리가 일치합니다.'
+            'detail': '일치'
         },
         'recv': {
             'is_equal': False, 
-            'detail': '쿼리가 일치하지 않습니다.'
+            'detail': '불일치'
         }
     }
     
