@@ -81,7 +81,7 @@ def read_interface_block(ws, start_col):
 
 class XMLComparator:
     # 클래스 변수로 BW_SEARCH_DIR 정의
-    BW_SEARCH_DIR = "./BW소스"
+    BW_SEARCH_DIR = "C:\\work\\LT\\BW소스"
 
     def __init__(self, excel_path: str, search_dir: str):
         """
@@ -99,7 +99,7 @@ class XMLComparator:
         self.query_parser = QueryParser()  # QueryParser 인스턴스 생성
         self.excel_manager = ExcelManager()  # ExcelManager 인스턴스 생성
         self.interface_results = []  # 모든 인터페이스 처리 결과 저장
-        self.output_path = 'comp_mq_bw.xlsx'  # 기본 출력 경로
+        self.output_path = 'C:\\work\\LT\\comp_mq_bw.xlsx'  # 기본 출력 경로
 
     def extract_from_xml(self, xml_path: str) -> Tuple[str, str]:
         """
@@ -847,18 +847,17 @@ class XMLComparator:
         return detail
 
 def main():
-    # 실행 환경에 맞게 조정된 경로 사용
-    excel_path = 'input_LT.xlsx'  # 인터페이스 정보 - 현재 디렉토리에서 검색
-    xml_dir = './xml'  # MQ XML 파일 디렉토리 - 현재 디렉토리 하위의 xml 폴더
-    bw_dir = './BW소스'  # BW XML 파일 디렉토리 경로 - 현재 디렉토리 하위의 BW소스 폴더
-    output_path = 'comp_mq_bw.xlsx'  # 출력 엑셀 파일 경로 - 현재 디렉토리에 저장
+    # 고정된 경로 사용
+    excel_path = 'C:\\work\\LT\\input_LT.xlsx' # 인터페이스 정보
+    xml_dir = 'C:\\work\\LT\\xml' # MQ XML 파일 디렉토리
+    bw_dir = 'C:\\work\\LT\\BW소스'  # BW XML 파일 디렉토리 경로
+    output_path = 'C:\\work\\LT\\comp_mq_bw.xlsx'  # 출력 엑셀 파일 경로
     
     # BW 검색 디렉토리 설정
     XMLComparator.BW_SEARCH_DIR = bw_dir
     
     # XML 비교기 초기화
     comparator = XMLComparator(excel_path, xml_dir)
-    comparator.output_path = output_path
     
     # 명령행 인자가 있을 경우 처리
     if len(sys.argv) > 1:
