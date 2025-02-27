@@ -27,7 +27,7 @@ def test_alias_handling():
     if not result.is_equal:
         print(result)
     
-    # 테스트 3: INSERT 쿼리에서 to_char format이 다른 경우
+    # 테스트 3: INSERT 쿼리에서 to_date format이 다른 경우
     query1 = """
     INSERT INTO TB_TEST (COL1, COL2, DATE_COL) 
     VALUES ('VAL1', 'VAL2', to_date(:DATE_COL, 'YYYYMMDDHH24MISS'))
@@ -37,7 +37,21 @@ def test_alias_handling():
     VALUES ('VAL1', 'VAL2', to_date(:DATE_COL, 'YYYY-MM-DD HH24:MI:SS'))
     """
     result = parser.compare_queries(query1, query2)
-    print(f"테스트 3 (INSERT 쿼리 다른 to_char 포맷): {'성공' if result.is_equal else '실패'}")
+    print(f"테스트 3 (INSERT 쿼리 다른 to_date 포맷): {'성공' if result.is_equal else '실패'}")
+    if not result.is_equal:
+        print(result)
+    
+    # 테스트 4: to_date 함수 내 공백 차이
+    query1 = """
+    INSERT INTO TB_TEST (COL1, COL2, DATE_COL) 
+    VALUES ('VAL1', 'VAL2', to_date(:DATE_COL,'YYYYMMDDHH24MISS'))
+    """
+    query2 = """
+    INSERT INTO TB_TEST (COL1, COL2, DATE_COL) 
+    VALUES ('VAL1', 'VAL2', to_date(:DATE_COL,  'YYYYMMDDHH24MISS'))
+    """
+    result = parser.compare_queries(query1, query2)
+    print(f"테스트 4 (to_date 함수 내 공백 차이): {'성공' if result.is_equal else '실패'}")
     if not result.is_equal:
         print(result)
 

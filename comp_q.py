@@ -488,6 +488,15 @@ class QueryParser:
         # 기본 공백 정규화
         norm_expr = re.sub(r'\s+', ' ', expr).strip().lower()
         
+        # 함수 내부의 공백 정규화 (특히 콤마와 따옴표 사이의 공백)
+        # 콤마 다음 공백 정규화
+        norm_expr = re.sub(r',\s+', ',', norm_expr)
+        # 콤마 이전 공백 정규화
+        norm_expr = re.sub(r'\s+,', ',', norm_expr)
+        # 괄호와 인자 사이의 공백 정규화
+        norm_expr = re.sub(r'\(\s+', '(', norm_expr)
+        norm_expr = re.sub(r'\s+\)', ')', norm_expr)
+        
         # to_char 함수의 포맷 부분 정규화
         # to_char(column, 'FORMAT') 패턴에서 'FORMAT' 부분을 일반화
         to_char_pattern = r"""
