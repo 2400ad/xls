@@ -106,7 +106,7 @@ class ExcelManager:
         self.mismatch_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")  # 빨간색
         self.unavailable_fill = PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid")  # 노란색
         
-        # 인터페이스 카운터 (인터페이스 시트 일련번호를 위한 변수)
+        # 인터페이스 카운터 (일련번호 생성용)
         self.interface_counter = 0
         
         # 인터페이스 ID와 일련번호 매핑
@@ -163,35 +163,45 @@ class ExcelManager:
         
         return sheet
 
-    def update_summary_sheet(self, data, row=None):
+    def update_summary_sheet(self, data):
         """
-        요약 시트에 인터페이스 정보 추가
+        요약 시트를 인터페이스 정보로 업데이트
         
         Args:
-            data (dict): 인터페이스 데이터
-            row (int, optional): 추가할 행 번호 (None이면 마지막 행 다음에 추가)
+            data (dict): 인터페이스 정보 및 결과를 담은 딕셔너리
         """
-        sheet = self.workbook["요약"] if "요약" in self.workbook.sheetnames else self.workbook.active
+        if "요약" not in self.workbook.sheetnames:
+            sheet = self.workbook.create_sheet("요약", 0)
+            self._setup_summary_header(sheet)
+        else:
+            sheet = self.workbook["요약"]
         
-        # 추가할 행 번호 결정
-        if row is None:
-            # 마지막 행 다음에 추가
-            row = 2
+        # 현재 행 번호 계산 (기존 데이터 이후에 추가)
+        row = sheet.max_row + 1
+        if sheet.cell(row=1, column=1).value is None:  # 첫 번째 행이 비어있으면 초기화
+            row = 1
+            
+        # 테이블의 빈 행 찾기
+        else:
             for r in range(2, sheet.max_row + 2):
                 if sheet.cell(row=r, column=2).value is None:
                     row = r
                     break
         
-        # # 인터페이스 카운터를 사용하여 일련번호 계산
-        # self.interface_counter += 1
-        # seq_num_formatted = f"{self.interface_counter:02d}"  # 01, 02, ... 형식으로 포맷팅
-        
-        # # 인터페이스 ID와 일련번호 매핑
-        # interface_id = data.get("interface_info", {}).get("interface_id", "")
-        # self.interface_number_map[interface_id] = seq_num_formatted
+        # 일련번호 증가 및 포맷팅
+        self.interface_counter += 1
+        seq_num_formatted = f"{self.interface_counter:02d}"  # 01, 02, ... 형식으로 포맷팅
         
         # 인터페이스 정보
         interface_info = data.get("interface_info", {})
+        
+        # 인터페이스 ID와 일련번호 매핑 저장
+        interface_id = interface_info.get("interface_id", "")
+        self.interface_number_map[interface_id] = seq_num_formatted
+        
+        print(f"[디버깅] 요약 시트 업데이트 - ID: {interface_id}, 일련번호: {seq_num_formatted}")
+        
+        # 나머지 데이터 가져오기
         file_results = data.get("file_results", {})
         bw_files = data.get("bw_files", [])
         comparisons = data.get("comparisons", {})
@@ -392,28 +402,22 @@ class ExcelManager:
         if comparison_results is None:
             comparison_results = {}
         
-        # 인터페이스 카운터를 사용하여 일련번호 계산
-        self.interface_counter += 1
-        seq_num_formatted = f"{self.interface_counter:02d}"  # 01, 02, ... 형식으로 포맷팅
-        
-        # 인터페이스 ID와 일련번호 매핑
-        interface_id = if_info.get("interface_id", "")
-        self.interface_number_map[interface_id] = seq_num_formatted
-
-        
-        # 시트 이름 생성 (인터페이스 이름 또는 ID)
-        sheet_name = if_info.get('interface_name', '') or if_info.get('interface_id', '')
-        
         # 인터페이스 ID에 해당하는 일련번호 찾기
         interface_id = if_info.get('interface_id', '')
         seq_num_formatted = self.interface_number_map.get(interface_id)
         
+        # 디버깅 정보 출력
         print(f"[디버깅] 인터페이스 시트 생성 - ID: {interface_id}, 일련번호: {seq_num_formatted}")
-        print(f"[디버깅] 현재 매핑 정보: {self.interface_number_map}")
         
-        # 시트 이름 앞에 일련번호를 붙임 (있는 경우에만)
+        # 시트 이름 생성 (인터페이스 이름 또는 ID)
+        sheet_name = if_info.get('interface_name', '') or if_info.get('interface_id', '')
+        
+        # 시트 이름 앞에 일련번호를 붙임
         if seq_num_formatted:
             sheet_name = f"{seq_num_formatted}_{sheet_name}"
+            print(f"[디버깅] 최종 시트 이름: {sheet_name}")
+        else:
+            print(f"[디버깅] 경고: {interface_id}에 대한 일련번호를 찾을 수 없음")
         
         # 시트 이름이 30자를 초과하면 자르기 (Excel 시트 이름 제한)
         if len(sheet_name) > 30:
