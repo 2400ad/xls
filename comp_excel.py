@@ -127,7 +127,7 @@ class ExcelManager:
         align_left = Alignment(horizontal='left', vertical='center', wrap_text=True)
         wrap_text_top = Alignment(wrap_text=True, vertical='top')
         
-        # 열 너비 설정
+        # 열 너비 설정 (기본값, 나중에 자동 조정됨)
         sheet.column_dimensions['A'].width = 5   # 일련번호
         sheet.column_dimensions['B'].width = 15  # 인터페이스 ID
         sheet.column_dimensions['C'].width = 15  # 인터페이스 명
@@ -145,13 +145,13 @@ class ExcelManager:
         
         for col_idx, header in enumerate(headers, 1):
             cell = sheet.cell(row=1, column=col_idx, value=header)
-            cell.font = Font(bold=True, size=10)
+            cell.font = Font(bold=True, size=9)  # 글꼴 크기를 9로 설정
             cell.fill = header_fill
             cell.alignment = align_center
             cell.border = border
         
         return sheet
-    
+
     def update_summary_sheet(self, data, row=None):
         """
         요약 시트에 인터페이스 정보 추가
@@ -181,67 +181,113 @@ class ExcelManager:
         bw_files = data.get("bw_files", [])
         comparisons = data.get("comparisons", {})
         
+        # 모든 셀에 기본 글꼴 크기 설정
+        font_size = 9
+        font_normal = Font(size=font_size)
+        
         # 값 설정
-        sheet.cell(row=row, column=1, value=seq_num_formatted)  # 일련번호
-        sheet.cell(row=row, column=2, value=interface_info.get("interface_id", ""))
-        sheet.cell(row=row, column=3, value=interface_info.get("interface_name", ""))
-        sheet.cell(row=row, column=4, value=f"{interface_info.get('send', {}).get('owner', '')}.{interface_info.get('send', {}).get('table_name', '')}")
+        cell = sheet.cell(row=row, column=1, value=seq_num_formatted)  # 일련번호
+        cell.font = font_normal
+        
+        cell = sheet.cell(row=row, column=2, value=interface_info.get("interface_id", ""))
+        cell.font = font_normal
+        
+        cell = sheet.cell(row=row, column=3, value=interface_info.get("interface_name", ""))
+        cell.font = font_normal
+        
+        cell = sheet.cell(row=row, column=4, value=f"{interface_info.get('send', {}).get('owner', '')}.{interface_info.get('send', {}).get('table_name', '')}")
+        cell.font = font_normal
         
         # MQ 파일 정보
-        sheet.cell(row=row, column=5, value=file_results.get("send", {}).get("path", ""))
+        cell = sheet.cell(row=row, column=5, value=file_results.get("send", {}).get("path", ""))
+        cell.font = font_normal
         
         # BW 파일 정보
         if isinstance(bw_files, list) and len(bw_files) > 0:
-            sheet.cell(row=row, column=6, value=bw_files[0])
+            cell = sheet.cell(row=row, column=6, value=bw_files[0])
         elif isinstance(bw_files, dict):
-            sheet.cell(row=row, column=6, value=bw_files.get("send", ""))
+            cell = sheet.cell(row=row, column=6, value=bw_files.get("send", ""))
+        cell.font = font_normal
         
         # 비교 결과 - 송신
         send_comparison = comparisons.get("send", {})
-        if isinstance(send_comparison, dict):
+        if isinstance(send_comparison, dict) and "is_equal" in send_comparison:
             is_equal = send_comparison.get("is_equal", False)
-            sheet.cell(row=row, column=7, value="일치" if is_equal else "차이")
+            cell = sheet.cell(row=row, column=7, value="일치" if is_equal else "차이")
         else:
-            sheet.cell(row=row, column=7, value="비교불가")
+            cell = sheet.cell(row=row, column=7, value="비교불가")
+        cell.font = font_normal
         
         # MQ 수신 파일
-        sheet.cell(row=row, column=8, value=file_results.get("recv", {}).get("path", ""))
+        cell = sheet.cell(row=row, column=8, value=file_results.get("recv", {}).get("path", ""))
+        cell.font = font_normal
         
         # BW 수신 파일
         if isinstance(bw_files, list) and len(bw_files) > 1:
-            sheet.cell(row=row, column=9, value=bw_files[1])
+            cell = sheet.cell(row=row, column=9, value=bw_files[1])
         elif isinstance(bw_files, dict):
-            sheet.cell(row=row, column=9, value=bw_files.get("recv", ""))
+            cell = sheet.cell(row=row, column=9, value=bw_files.get("recv", ""))
+        cell.font = font_normal
         
         # 비교 결과 - 수신
         recv_comparison = comparisons.get("recv", {})
-        if isinstance(recv_comparison, dict):
+        if isinstance(recv_comparison, dict) and "is_equal" in recv_comparison:
             is_equal = recv_comparison.get("is_equal", False)
-            sheet.cell(row=row, column=10, value="일치" if is_equal else "차이")
+            cell = sheet.cell(row=row, column=10, value="일치" if is_equal else "차이")
         else:
-            sheet.cell(row=row, column=10, value="비교불가")
-    
+            cell = sheet.cell(row=row, column=10, value="비교불가")
+        cell.font = font_normal
+
     def save_excel_output(self, output_path):
         """
         처리된 결과를 엑셀 파일로 저장
         
         Args:
             output_path (str): 출력 엑셀 파일 경로
-            
+        
         Returns:
             bool: 저장 성공 여부
         """
-        # output_path 값을 인스턴스 변수에 저장
-        self.output_path = output_path
-        
         try:
-            self.workbook.save(output_path)
-            print(f"\n[결과 저장 완료] 파일 경로: {output_path}")
-            return True
+            # 요약 시트의 컬럼 너비를 내용에 맞게 자동 조정
+            self._adjust_column_widths()
+            
+            # 파일이 이미 열려있는 경우를 대비해 예외 처리
+            try:
+                self.workbook.save(output_path)
+                print(f"[결과 저장 완료] 파일 경로: {output_path}")
+                return True
+            except PermissionError:
+                print(f"[저장 실패] 파일이 다른 프로그램에서 사용 중입니다: {output_path}")
+                return False
         except Exception as e:
-            print(f"엑셀 파일 저장 중 오류 발생: {e}")
+            print(f"[저장 실패] 오류 발생: {str(e)}")
             return False
-    
+
+    def _adjust_column_widths(self):
+        """
+        요약 시트의 컬럼 너비를 내용에 맞게 자동 조정
+        """
+        if "요약" in self.workbook.sheetnames:
+            sheet = self.workbook["요약"]
+            
+            # 각 열의 최대 길이 계산
+            for col_idx in range(1, 11):  # 1~10열까지
+                col_letter = get_column_letter(col_idx)
+                max_length = 0
+                
+                # 헤더와 모든 행 확인
+                for row_idx in range(1, sheet.max_row + 1):
+                    cell = sheet.cell(row=row_idx, column=col_idx)
+                    if cell.value:
+                        # 셀 값의 길이 계산
+                        cell_length = len(str(cell.value))
+                        max_length = max(max_length, cell_length)
+                
+                # 최소 너비 5, 최대 너비 50으로 제한
+                adjusted_width = min(max(max_length + 2, 5), 50)
+                sheet.column_dimensions[col_letter].width = adjusted_width
+
     def create_interface_sheet(self, if_info, mq_files=None, bw_files=None, queries=None, comparison_results=None):
         """
         엑셀 파일에 각 인터페이스별 시트를 생성하고, 데이터를 기록
