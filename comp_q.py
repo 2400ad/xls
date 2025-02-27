@@ -65,55 +65,94 @@ class QueryParser:
         Returns:
             str: Normalized query
         """
+        print(f"Original query: {query}")
+        
         # Remove comments if any
         query = re.sub(r'--.*$', '', query, flags=re.MULTILINE)
+        
+        # Replace newlines with spaces
+        query = re.sub(r'\n', ' ', query)
         
         # Replace multiple whitespace with single space
         query = re.sub(r'\s+', ' ', query)
         
-        # Remove whitespace around common SQL punctuation
-        query = re.sub(r'\s*(,|\(|\))\s*', r'\1', query)
+        # 핵심 SQL 키워드 주변에 공백 추가 (대소문자 구분 없이)
+        keywords = ['SELECT', 'FROM', 'WHERE', 'ORDER BY', 'GROUP BY', 'HAVING', 
+                   'JOIN', 'LEFT', 'RIGHT', 'INNER', 'OUTER', 'ON', 'AS']
         
-        # Ensure single space after SQL keywords (case-insensitive match but preserve original case)
-        for keyword in ['SELECT', 'FROM', 'WHERE', 'INTO', 'VALUES']:
-            query = re.sub(f'(?i){keyword}\\s+', f'{keyword} ', query)
+        # 각 키워드를 공백으로 둘러싸기 (단어 경계 고려)
+        for keyword in keywords:
+            # \b는 단어 경계를 의미
+            pattern = re.compile(r'\b' + keyword + r'\b', re.IGNORECASE)
+            # 각 키워드를 찾아서 앞뒤에 공백 추가
+            query = pattern.sub(' ' + keyword + ' ', query)
         
-        return query.strip()
+        # 다시 중복 공백 제거
+        query = re.sub(r'\s+', ' ', query)
+        
+        result = query.strip()
+        print(f"Normalized query: {result}")
+        return result
 
     def parse_select_columns(self, query) -> Optional[Dict[str, str]]:
         """Extract columns from SELECT query and return as dictionary"""
-        # 정규화된 쿼리 사용
-        query = self.normalize_query(query)
+        # 대소문자 구분 없이 정규화
+        print(f"Parsing query: {query}")
         
-        # SELECT와 FROM 사이의 컬럼 추출
-        match = re.search(r'SELECT\s+(.*?)\s+FROM', query, flags=re.IGNORECASE)
-        if not match:
+        # SELECT 키워드 위치 찾기
+        select_match = re.search(r'\bSELECT\b', query, re.IGNORECASE)
+        from_match = re.search(r'\bFROM\b', query, re.IGNORECASE)
+        
+        if not select_match or not from_match:
+            print(f"Could not find SELECT or FROM keywords in query: {query}")
             return None
-            
-        columns = {}
-        # 컬럼 분리시 괄호를 고려하여 처리
-        for col in self._parse_csv_with_functions(match.group(1)):
-            col = col.strip()
-            if not col:  # 빈 문자열인 경우 스킵
-                continue
-                
-            # SQL 함수나 표현식에서 별칭 추출
-            # AS 키워드 또는 별칭만 있는 경우 처리
-            alias_match = re.search(r'(.+?)\s+(?:AS\s+)?([a-zA-Z0-9_]+)$', col)
-            
-            if alias_match:
-                # 식과 별칭이 존재하는 경우: to_char(tdate, 'YYYYMMDDHH24MISS') tdate
-                expr, alias = alias_match.groups()
-                expr = expr.strip()
-                alias = alias.strip()
-                
-                # 원래 컬럼식을 키로 저장 (비교를 위해)
-                # 별칭과 표현식을 함께 저장
-                columns[expr] = {'expr': expr, 'alias': alias, 'full': col}
-            else:
-                # 별칭이 없는 경우: to_char(tdate, 'YYYYMMDDHH24MISS')
-                columns[col] = {'expr': col, 'alias': None, 'full': col}
         
+        # SELECT와 FROM 사이의 부분 추출
+        select_pos = select_match.end()
+        from_pos = from_match.start()
+        
+        if select_pos >= from_pos:
+            print(f"Invalid query structure (SELECT appears after FROM): {query}")
+            return None
+        
+        # 컬럼 부분 추출
+        column_part = query[select_pos:from_pos].strip()
+        print(f"Extracted column part: {column_part}")
+        
+        # 컬럼 분리 및 처리
+        columns = {}
+        for col in self._parse_csv_with_functions(column_part):
+            col = col.strip()
+            if not col:
+                continue
+            
+            print(f"Processing column: {col}")
+            
+            # to_char 함수 처리 (별칭 유무에 관계없이)
+            if 'to_char(' in col.lower():
+                # 함수 호출 이후에 별칭이 있는지 확인
+                alias_match = re.search(r'(to_char\s*\([^)]+\))\s+([a-zA-Z0-9_]+)$', col, re.IGNORECASE)
+                if alias_match:
+                    # 별칭이 있는 경우
+                    expr, alias = alias_match.groups()
+                    print(f"Found to_char with alias: {expr} -> {alias}")
+                    columns[expr.strip()] = {'expr': expr.strip(), 'alias': alias.strip(), 'full': col}
+                else:
+                    # 별칭이 없는 경우
+                    print(f"Found to_char without alias: {col}")
+                    columns[col] = {'expr': col, 'alias': None, 'full': col}
+            else:
+                # 일반 열 처리
+                alias_match = re.search(r'(.+?)\s+(?:AS\s+)?([a-zA-Z0-9_]+)$', col, re.IGNORECASE)
+                if alias_match:
+                    expr, alias = alias_match.groups()
+                    print(f"Found column with alias: {expr} -> {alias}")
+                    columns[expr.strip()] = {'expr': expr.strip(), 'alias': alias.strip(), 'full': col}
+                else:
+                    print(f"Found column without alias: {col}")
+                    columns[col] = {'expr': col, 'alias': None, 'full': col}
+        
+        print(f"Final parsed columns: {columns}")
         return columns if columns else None
 
     def _extract_values_with_balanced_parentheses(self, query, start_idx):
@@ -376,13 +415,15 @@ class QueryParser:
         norm_expr1_map = {}
         for info in columns1_filtered.values():
             expr = info['expr'].strip()
-            norm_expr = re.sub(r'\s+', ' ', expr).strip().lower()
+            # to_char 함수의 포맷 문자열을 정규화 (포맷 차이 무시)
+            norm_expr = self._normalize_tochar_format(expr)
             norm_expr1_map[norm_expr] = expr
             
         norm_expr2_map = {}
         for info in columns2_filtered.values():
             expr = info['expr'].strip()
-            norm_expr = re.sub(r'\s+', ' ', expr).strip().lower()
+            # to_char 함수의 포맷 문자열을 정규화 (포맷 차이 무시)
+            norm_expr = self._normalize_tochar_format(expr)
             norm_expr2_map[norm_expr] = expr
             
         # 정규화된 표현식 세트
@@ -400,7 +441,7 @@ class QueryParser:
             orig_expr = norm_expr1_map[norm_expr]
             # 이 표현식을 포함하는 컬럼 정보 찾기
             for col, info in columns1_filtered.items():
-                norm_col_expr = re.sub(r'\s+', ' ', info['expr'].strip()).lower()
+                norm_col_expr = self._normalize_tochar_format(info['expr'].strip())
                 if norm_col_expr == norm_expr:
                     result.add_difference(col, info['full'], None)
                     is_equal = False
@@ -411,13 +452,41 @@ class QueryParser:
             orig_expr = norm_expr2_map[norm_expr]
             # 이 표현식을 포함하는 컬럼 정보 찾기
             for col, info in columns2_filtered.items():
-                norm_col_expr = re.sub(r'\s+', ' ', info['expr'].strip()).lower()
+                norm_col_expr = self._normalize_tochar_format(info['expr'].strip())
                 if norm_col_expr == norm_expr:
                     result.add_difference(col, None, info['full'])
                     is_equal = False
                     break
         
         return is_equal
+    
+    def _normalize_tochar_format(self, expr):
+        """
+        to_char 함수의 포맷 문자열을 정규화합니다.
+        포맷 문자열의 차이를 무시하고 함수와 인자 패턴만 비교합니다.
+        
+        Args:
+            expr (str): SQL 표현식
+            
+        Returns:
+            str: 정규화된 표현식
+        """
+        # 기본 공백 정규화
+        norm_expr = re.sub(r'\s+', ' ', expr).strip().lower()
+        
+        # to_char 함수의 포맷 부분 정규화
+        # to_char(column, 'FORMAT') 패턴에서 'FORMAT' 부분을 일반화
+        to_char_pattern = r"""
+            (to_char\s*\(\s*[^,]+\s*,\s*)  # 함수 이름과 첫 인자
+            (?:\'[^\']*\'|\"[^\"]*\")      # 포맷 문자열
+            (\s*\))                        # 닫는 괄호
+        """
+        to_char_pattern = re.compile(to_char_pattern, flags=re.IGNORECASE | re.VERBOSE)
+        
+        # to_char 함수의 포맷 문자열을 'FORMAT'으로 일반화
+        norm_expr = to_char_pattern.sub(r'\1\'FORMAT\'\2', norm_expr)
+        
+        return norm_expr
 
     def check_special_columns(self, query: str, direction: str) -> List[str]:
         """
@@ -830,7 +899,7 @@ class QueryParser:
         # MQ XML에서 테이블 이름 추출
         mq_queries = self.parse_xml_file(mq_xml_path)
         if not mq_queries or not mq_queries[0]:
-            print(f"Failed to extract SELECT query from MQ XML: {mq_xml_path}")
+            print(f"Failed to parse MQ XML file: {mq_xml_path}")
             return results
             
         table_name = self.extract_table_name(mq_queries[0][0]) if mq_queries[0] else None

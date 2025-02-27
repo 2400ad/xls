@@ -96,7 +96,7 @@ class XMLComparator:
         self.workbook = openpyxl.load_workbook(excel_path)
         self.worksheet = self.workbook.active
         self.mapper = ColumnMapper()
-        self.query_parser = QueryParser()
+        self.query_parser = QueryParser()  # QueryParser 인스턴스 생성
         self.excel_manager = ExcelManager()  # ExcelManager 인스턴스 생성
         self.interface_results = []  # 모든 인터페이스 처리 결과 저장
         self.output_path = 'C:\\work\\LT\\comp_mq_bw.xlsx'  # 기본 출력 경로
