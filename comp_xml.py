@@ -29,14 +29,31 @@ def read_interface_block(ws, start_col):
             return None
             
         # DB 연결 정보 (3행에서 읽기)
-        send_db_info = ast.literal_eval(ws.cell(row=3, column=start_col).value)
-        recv_db_info = ast.literal_eval(ws.cell(row=3, column=start_col + 1).value)
+        try:
+            send_db_value = ws.cell(row=3, column=start_col).value
+            send_db_info = ast.literal_eval(send_db_value) if send_db_value else {}
+            
+            recv_db_value = ws.cell(row=3, column=start_col + 1).value
+            recv_db_info = ast.literal_eval(recv_db_value) if recv_db_value else {}
+        except (SyntaxError, ValueError):
+            # 데이터 형식 오류 시 빈 딕셔너리로 설정
+            send_db_info = {}
+            recv_db_info = {}
+            
         interface_info['send']['db_info'] = send_db_info
         interface_info['recv']['db_info'] = recv_db_info
         
         # 테이블 정보 (4행에서 읽기)
-        send_table_info = ast.literal_eval(ws.cell(row=4, column=start_col).value)
-        recv_table_info = ast.literal_eval(ws.cell(row=4, column=start_col + 1).value)
+        try:
+            send_table_value = ws.cell(row=4, column=start_col).value
+            send_table_info = ast.literal_eval(send_table_value) if send_table_value else {}
+            
+            recv_table_value = ws.cell(row=4, column=start_col + 1).value
+            recv_table_info = ast.literal_eval(recv_table_value) if recv_table_value else {}
+        except (SyntaxError, ValueError):
+            # 데이터 형식 오류 시 빈 딕셔너리로 설정
+            send_table_info = {}
+            recv_table_info = {}
         
         interface_info['send']['owner'] = send_table_info.get('owner')
         interface_info['send']['table_name'] = send_table_info.get('table_name')
