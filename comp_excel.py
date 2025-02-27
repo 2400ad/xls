@@ -182,13 +182,13 @@ class ExcelManager:
                     row = r
                     break
         
-        # 인터페이스 카운터를 사용하여 일련번호 계산
-        self.interface_counter += 1
-        seq_num_formatted = f"{self.interface_counter:02d}"  # 01, 02, ... 형식으로 포맷팅
+        # # 인터페이스 카운터를 사용하여 일련번호 계산
+        # self.interface_counter += 1
+        # seq_num_formatted = f"{self.interface_counter:02d}"  # 01, 02, ... 형식으로 포맷팅
         
-        # 인터페이스 ID와 일련번호 매핑
-        interface_id = data.get("interface_info", {}).get("interface_id", "")
-        self.interface_number_map[interface_id] = seq_num_formatted
+        # # 인터페이스 ID와 일련번호 매핑
+        # interface_id = data.get("interface_info", {}).get("interface_id", "")
+        # self.interface_number_map[interface_id] = seq_num_formatted
         
         # 인터페이스 정보
         interface_info = data.get("interface_info", {})
@@ -391,6 +391,15 @@ class ExcelManager:
             queries = {}
         if comparison_results is None:
             comparison_results = {}
+        
+        # 인터페이스 카운터를 사용하여 일련번호 계산
+        self.interface_counter += 1
+        seq_num_formatted = f"{self.interface_counter:02d}"  # 01, 02, ... 형식으로 포맷팅
+        
+        # 인터페이스 ID와 일련번호 매핑
+        interface_id = if_info.get("interface_id", "")
+        self.interface_number_map[interface_id] = seq_num_formatted
+
         
         # 시트 이름 생성 (인터페이스 이름 또는 ID)
         sheet_name = if_info.get('interface_name', '') or if_info.get('interface_id', '')
