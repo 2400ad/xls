@@ -701,30 +701,44 @@ class XMLComparator:
                 if_info = result['interface_info']
                 
                 # ExcelManager를 사용하여 인터페이스 시트 생성
+                # MQ 파일 정보
+                mq_files = {
+                    'send': result['file_results']['send'],
+                    'recv': result['file_results']['recv']
+                }
+                
+                # BW 파일 정보
+                bw_files = {
+                    'send': result.get('bw_files', [])[0] if result.get('bw_files') and len(result.get('bw_files')) > 0 else 'N/A',
+                    'recv': result.get('bw_files', [])[1] if result.get('bw_files') and len(result.get('bw_files')) > 1 else 'N/A'
+                }
+                
+                # 쿼리 정보
+                queries = {
+                    'mq_send': result['file_results']['send']['query'],
+                    'bw_send': result['bw_queries']['send'],
+                    'mq_recv': result['file_results']['recv']['query'],
+                    'bw_recv': result['bw_queries']['recv']
+                }
+                
+                # 비교 결과
+                comparison_results = {
+                    'send': {
+                        'is_equal': result['comparisons']['send'].is_equal if result['comparisons']['send'] else False,
+                        'detail': result['comparisons']['send'].detail if result['comparisons']['send'] else '비교 불가'
+                    },
+                    'recv': {
+                        'is_equal': result['comparisons']['recv'].is_equal if result['comparisons']['recv'] else False,
+                        'detail': result['comparisons']['recv'].detail if result['comparisons']['recv'] else '비교 불가'
+                    }
+                }
+                
                 self.excel_manager.create_interface_sheet(
                     if_info, 
-                    {
-                        '송신 파일': {
-                            '경로': result['file_results']['send']['path'],
-                            '쿼리': result['file_results']['send']['query']
-                        },
-                        '수신 파일': {
-                            '경로': result['file_results']['recv']['path'],
-                            '쿼리': result['file_results']['recv']['query']
-                        },
-                        'BW 송신 파일': {
-                            '경로': result.get('bw_files', [])[0] if result.get('bw_files') else '매핑파일없음', 
-                            '쿼리': result['bw_queries']['send']
-                        },
-                        'BW 수신 파일': {
-                            '경로': result.get('bw_files', [])[1] if result.get('bw_files', []) and len(result.get('bw_files', [])) > 1 else '매핑파일없음', 
-                            '쿼리': result['bw_queries']['recv']
-                        },
-                        '비교 결과': {
-                            '송신': '일치' if result['comparisons']['send'] and result['comparisons']['send'].is_equal else '차이',
-                            '수신': '일치' if result['comparisons']['recv'] and result['comparisons']['recv'].is_equal else '차이'
-                        }
-                    }
+                    mq_files, 
+                    bw_files, 
+                    queries, 
+                    comparison_results
                 )
                 
                 # 요약 시트 업데이트

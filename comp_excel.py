@@ -136,6 +136,8 @@ class ExcelManager:
             bottom=Side(style='thin')
         )
         align_center = Alignment(horizontal='center', vertical='center', wrap_text=True)
+        align_left = Alignment(horizontal='left', vertical='center', wrap_text=True)
+        wrap_text_top = Alignment(wrap_text=True, vertical='top')
         
         # 열 너비 설정
         sheet.column_dimensions['A'].width = 15  # 인터페이스 ID
@@ -191,6 +193,15 @@ class ExcelManager:
             queries (dict): 쿼리 정보 (MQ/BW, 송신/수신)
             comparison_results (dict): 비교 결과
         """
+        if mq_files is None:
+            mq_files = {}
+        if bw_files is None:
+            bw_files = {}
+        if queries is None:
+            queries = {}
+        if comparison_results is None:
+            comparison_results = {}
+            
         # 시트 이름 생성 (인터페이스 이름 또는 ID)
         sheet_name = if_info.get('interface_name', '') or if_info.get('interface_id', '')
         
@@ -209,7 +220,7 @@ class ExcelManager:
         sheet = self.workbook.create_sheet(title=sheet_name)
         
         # 스타일 정의
-        header_fill = PatternFill(start_color="CCCCFF", end_color="CCCCFF", fill_type="solid")
+        header_fill = PatternFill(start_color="E6E6FA", end_color="E6E6FA", fill_type="solid")
         border = Border(
             left=Side(style='thin'),
             right=Side(style='thin'),
@@ -218,6 +229,7 @@ class ExcelManager:
         )
         align_center = Alignment(horizontal='center', vertical='center', wrap_text=True)
         align_left = Alignment(horizontal='left', vertical='center', wrap_text=True)
+        wrap_text_top = Alignment(wrap_text=True, vertical='top')
         
         # 열 너비 설정
         sheet.column_dimensions[get_column_letter(1)].width = 15
@@ -307,7 +319,10 @@ class ExcelManager:
         # 송신 파일 정보 입력
         row = 7
         sheet.cell(row=row, column=2, value=mq_files.get('send', {}).get('path', 'N/A'))
-        sheet.cell(row=row, column=3, value=bw_files.get('send', 'N/A'))
+        if isinstance(bw_files, dict):
+            sheet.cell(row=row, column=3, value=bw_files.get('send', 'N/A'))
+        else:
+            sheet.cell(row=row, column=3, value='N/A')
         
         # 2.2 수신 파일 정보
         row = 8
@@ -325,7 +340,10 @@ class ExcelManager:
         # 수신 파일 정보 입력
         row = 9
         sheet.cell(row=row, column=2, value=mq_files.get('recv', {}).get('path', 'N/A'))
-        sheet.cell(row=row, column=3, value=bw_files.get('recv', 'N/A'))
+        if isinstance(bw_files, dict):
+            sheet.cell(row=row, column=3, value=bw_files.get('recv', 'N/A'))
+        else:
+            sheet.cell(row=row, column=3, value='N/A')
         
         # 2.3 송신 쿼리 및 비교 결과
         row = 11
@@ -343,28 +361,32 @@ class ExcelManager:
         sheet.cell(row=row, column=5).fill = header_fill
         sheet.cell(row=row, column=5).alignment = align_center
         
-        # 송신 쿼리 및 비교 결과 입력
+        # 송신 쿼리 정보 입력
         row = 12
-        # MQ 송신 쿼리
-        mq_send_query = queries.get('mq_send', 'N/A')
-        sheet.cell(row=row, column=1, value=mq_send_query)
-        sheet.merge_cells(start_row=row, start_column=1, end_row=row, end_column=2)
-        sheet.cell(row=row, column=1).alignment = Alignment(wrap_text=True, vertical='top')
+        sheet.cell(row=row, column=1, value=mq_files.get('send', {}).get('query', queries.get('mq_send', 'N/A')))
+        sheet.cell(row=row, column=1).alignment = wrap_text_top
+        sheet.cell(row=row, column=2, value=queries.get('bw_send', 'N/A'))
+        sheet.cell(row=row, column=2).alignment = wrap_text_top
         
-        # BW 송신 쿼리
-        bw_send_query = queries.get('bw_send', 'N/A')
-        sheet.cell(row=row, column=3, value=bw_send_query)
-        sheet.cell(row=row, column=3).alignment = Alignment(wrap_text=True, vertical='top')
+        # 비교 결과 입력
+        is_send_equal = False
+        send_detail = 'N/A'
+        if comparison_results and 'send' in comparison_results:
+            if isinstance(comparison_results['send'], dict):
+                is_send_equal = comparison_results['send'].get('is_equal', False)
+                send_detail = comparison_results['send'].get('detail', 'N/A')
+            elif hasattr(comparison_results['send'], 'is_equal'):
+                is_send_equal = comparison_results['send'].is_equal
+                send_detail = getattr(comparison_results['send'], 'detail', 'N/A')
+                
+        sheet.cell(row=row, column=3, value='일치' if is_send_equal else '차이')
+        sheet.cell(row=row, column=3).alignment = align_center
+        sheet.cell(row=row, column=4, value=send_detail)
         
-        # 송신 비교 결과
-        send_result = "일치" if comparison_results.get('send', {}).get('is_equal', False) else "차이"
-        sheet.cell(row=row, column=4, value=send_result)
-        sheet.cell(row=row, column=4).alignment = align_center
-        
-        # 송신 비교 상세
-        send_detail = comparison_results.get('send', {}).get('detail', 'N/A')
-        sheet.cell(row=row, column=5, value=send_detail)
-        sheet.cell(row=row, column=5).alignment = Alignment(wrap_text=True, vertical='top')
+        if is_send_equal:
+            sheet.cell(row=row, column=3).fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
+        else:
+            sheet.cell(row=row, column=3).fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
         
         # 쿼리 행 높이 설정
         sheet.row_dimensions[row].height = 150
@@ -373,40 +395,47 @@ class ExcelManager:
         row = 14
         sheet.cell(row=row, column=1, value="수신 MQ 쿼리").font = Font(bold=True)
         sheet.cell(row=row, column=1).fill = header_fill
+        sheet.cell(row=row, column=1).alignment = align_center
         
-        sheet.cell(row=row, column=3, value="수신 BW 쿼리").font = Font(bold=True)
+        sheet.cell(row=row, column=2, value="수신 BW 쿼리").font = Font(bold=True)
+        sheet.cell(row=row, column=2).fill = header_fill
+        sheet.cell(row=row, column=2).alignment = align_center
+        
+        sheet.cell(row=row, column=3, value="비교").font = Font(bold=True)
         sheet.cell(row=row, column=3).fill = header_fill
+        sheet.cell(row=row, column=3).alignment = align_center
         
-        sheet.cell(row=row, column=4, value="비교").font = Font(bold=True)
+        sheet.cell(row=row, column=4, value="비교 상세").font = Font(bold=True)
         sheet.cell(row=row, column=4).fill = header_fill
         sheet.cell(row=row, column=4).alignment = align_center
         
-        sheet.cell(row=row, column=5, value="비교 상세").font = Font(bold=True)
-        sheet.cell(row=row, column=5).fill = header_fill
-        sheet.cell(row=row, column=5).alignment = align_center
-        
-        # 수신 쿼리 및 비교 결과 입력
+        # 수신 쿼리 정보 입력
         row = 15
-        # MQ 수신 쿼리
-        mq_recv_query = queries.get('mq_recv', 'N/A')
-        sheet.cell(row=row, column=1, value=mq_recv_query)
-        sheet.merge_cells(start_row=row, start_column=1, end_row=row, end_column=2)
-        sheet.cell(row=row, column=1).alignment = Alignment(wrap_text=True, vertical='top')
+        sheet.cell(row=row, column=1, value=mq_files.get('recv', {}).get('query', queries.get('mq_recv', 'N/A')))
+        sheet.cell(row=row, column=1).alignment = wrap_text_top
+        sheet.cell(row=row, column=2, value=queries.get('bw_recv', 'N/A'))
+        sheet.cell(row=row, column=2).alignment = wrap_text_top
         
-        # BW 수신 쿼리
-        bw_recv_query = queries.get('bw_recv', 'N/A')
-        sheet.cell(row=row, column=3, value=bw_recv_query)
-        sheet.cell(row=row, column=3).alignment = Alignment(wrap_text=True, vertical='top')
+        # 비교 결과 입력
+        is_recv_equal = False
+        recv_detail = 'N/A'
+        if comparison_results and 'recv' in comparison_results:
+            if isinstance(comparison_results['recv'], dict):
+                is_recv_equal = comparison_results['recv'].get('is_equal', False)
+                recv_detail = comparison_results['recv'].get('detail', 'N/A')
+            elif hasattr(comparison_results['recv'], 'is_equal'):
+                is_recv_equal = comparison_results['recv'].is_equal
+                recv_detail = getattr(comparison_results['recv'], 'detail', 'N/A')
+                
+        sheet.cell(row=row, column=3, value='일치' if is_recv_equal else '차이')
+        sheet.cell(row=row, column=3).alignment = align_center
+        sheet.cell(row=row, column=4, value=recv_detail)
+        sheet.cell(row=row, column=4).alignment = wrap_text_top
         
-        # 수신 비교 결과
-        recv_result = "일치" if comparison_results.get('recv', {}).get('is_equal', False) else "차이"
-        sheet.cell(row=row, column=4, value=recv_result)
-        sheet.cell(row=row, column=4).alignment = align_center
-        
-        # 수신 비교 상세
-        recv_detail = comparison_results.get('recv', {}).get('detail', 'N/A')
-        sheet.cell(row=row, column=5, value=recv_detail)
-        sheet.cell(row=row, column=5).alignment = Alignment(wrap_text=True, vertical='top')
+        if is_recv_equal:
+            sheet.cell(row=row, column=3).fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
+        else:
+            sheet.cell(row=row, column=3).fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
         
         # 쿼리 행 높이 설정
         sheet.row_dimensions[row].height = 150
@@ -442,6 +471,7 @@ class ExcelManager:
         )
         align_center = Alignment(horizontal='center', vertical='center', wrap_text=True)
         align_left = Alignment(horizontal='left', vertical='center', wrap_text=True)
+        wrap_text_top = Alignment(wrap_text=True, vertical='top')
         
         # 인터페이스 정보
         interface_info = result.get('interface_info', {})
