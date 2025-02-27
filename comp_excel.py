@@ -105,7 +105,10 @@ class ExcelManager:
         self.match_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")  # 녹색
         self.mismatch_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")  # 빨간색
         self.unavailable_fill = PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid")  # 노란색
-    
+        
+        # 인터페이스 ID와 일련번호 매핑을 저장하는 딕셔너리
+        self.interface_id_map = {}
+
     def initialize_excel_output(self):
         """
         결과를 저장할 새 엑셀 파일 초기화
@@ -339,6 +342,9 @@ class ExcelManager:
             cell.fill = PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid")  # 노란색
         cell.font = font_normal
 
+        # 인터페이스 ID와 일련번호 매핑 저장
+        self.interface_id_map[interface_info.get("interface_id", "")] = seq_num_formatted
+
     def save_excel_output(self, output_path):
         """
         처리된 결과를 엑셀 파일로 저장
@@ -386,15 +392,7 @@ class ExcelManager:
         sheet_name = if_info.get('interface_name', '') or if_info.get('interface_id', '')
         
         # 일련번호 찾기
-        seq_num = None  # 기본값을 None으로 설정
-        if "요약" in self.workbook.sheetnames:
-            summary_sheet = self.workbook["요약"]
-            for row in range(2, summary_sheet.max_row + 1):
-                interface_id = summary_sheet.cell(row=row, column=2).value
-                if interface_id == if_info.get('interface_id', ''):
-                    # 요약 시트에서 해당 인터페이스의 일련번호를 가져옴
-                    seq_num = summary_sheet.cell(row=row, column=1).value
-                    break
+        seq_num = self.interface_id_map.get(if_info.get('interface_id', ''))
         
         # 시트 이름 앞에 일련번호를 붙임 (있는 경우에만)
         if seq_num:
@@ -773,6 +771,74 @@ def main():
     }
     
     excel_manager.create_interface_sheet(if_info, mq_files, bw_files, queries, comparison_results)
+    
+    # 두 번째 샘플 인터페이스 데이터 추가
+    sample_data2 = {
+        "interface_info": {
+            "interface_id": "IF002", 
+            "interface_name": "두 번째 테스트 인터페이스", 
+            "send": {
+                "owner": "OWNER2",
+                "table_name": "TEST_TABLE2",
+                "db_info": {
+                    "sid": "10.10.10.10:1521/DEVDB",
+                    "system": "개발시스템"
+                }
+            },
+            "recv": {
+                "owner": "OWNER2",
+                "table_name": "TEST_RCV_TABLE2",
+                "db_info": {
+                    "sid": "10.10.10.20:1521/PRODDB",
+                    "system": "운영시스템"
+                }
+            }
+        }, 
+        "file_results": {
+            "send": {"path": "test2.SND.xml", "query": "SELECT * FROM OWNER2.TEST_TABLE2"}, 
+            "recv": {"path": "test2.RCV.xml", "query": "SELECT * FROM OWNER2.TEST_RCV_TABLE2"}
+        }, 
+        "bw_files": ["bw_mapping2.xml", "bw_mapping2_2.xml"], 
+        "comparisons": {
+            "send": {"is_equal": True, "detail": "일치"}, 
+            "recv": {"is_equal": True, "detail": "일치"}
+        }
+    }
+    excel_manager.update_summary_sheet(sample_data2)
+    
+    # 두 번째 인터페이스 시트 생성
+    if_info2 = {
+        'interface_id': 'IF002',
+        'interface_name': '두 번째 테스트 인터페이스',
+        'send': {
+            'owner': 'OWNER2',
+            'table_name': 'TEST_TABLE2',
+            'db_info': {
+                'sid': '10.10.10.10:1521/DEVDB',
+                'system': '개발시스템'
+            }
+        },
+        'recv': {
+            'owner': 'OWNER2',
+            'table_name': 'TEST_RCV_TABLE2',
+            'db_info': {
+                'sid': '10.10.10.20:1521/PRODDB',
+                'system': '운영시스템'
+            }
+        }
+    }
+    
+    mq_files2 = {
+        'send': {'path': 'test2.SND.xml', 'query': 'SELECT * FROM OWNER2.TEST_TABLE2 WHERE 1=1'},
+        'recv': {'path': 'test2.RCV.xml', 'query': 'SELECT * FROM OWNER2.TEST_RCV_TABLE2 WHERE status = \'Y\''}
+    }
+    
+    # 인터페이스 ID와 일련번호 매핑 정보 출력
+    print("\n=== 인터페이스 ID와 일련번호 매핑 ===")
+    for if_id, seq_num in excel_manager.interface_id_map.items():
+        print(f"인터페이스 ID: {if_id}, 일련번호: {seq_num}")
+    
+    excel_manager.create_interface_sheet(if_info2, mq_files2, bw_files, queries, comparison_results)
     
     # 결과 저장
     output_path = 'comp_mq_bw_sample.xlsx'
