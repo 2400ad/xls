@@ -383,8 +383,8 @@ class QueryParser:
                     val1 = columns1_filtered[col]
                     val2 = columns2_filtered[col]
                     
-                    # to_char 함수를 포함하는 값이면 정규화 적용
-                    if 'to_char(' in val1.lower() or 'to_char(' in val2.lower():
+                    # to_char 또는 to_date 함수를 포함하는 값이면 정규화 적용
+                    if 'to_char(' in val1.lower() or 'to_char(' in val2.lower() or 'to_date(' in val1.lower() or 'to_date(' in val2.lower():
                         norm_val1 = self._normalize_tochar_format(val1)
                         norm_val2 = self._normalize_tochar_format(val2)
                         if norm_val1 != norm_val2:
@@ -476,7 +476,7 @@ class QueryParser:
     
     def _normalize_tochar_format(self, expr):
         """
-        to_char 함수의 포맷 문자열을 정규화합니다.
+        to_char 함수와 to_date 함수의 포맷 문자열을 정규화합니다.
         포맷 문자열의 차이를 무시하고 함수와 인자 패턴만 비교합니다.
         
         Args:
@@ -497,8 +497,18 @@ class QueryParser:
         """
         to_char_pattern = re.compile(to_char_pattern, flags=re.IGNORECASE | re.VERBOSE)
         
-        # to_char 함수의 포맷 문자열을 'FORMAT'으로 일반화
+        # to_date 함수의 포맷 부분 정규화
+        # to_date(column, 'FORMAT') 패턴에서 'FORMAT' 부분을 일반화
+        to_date_pattern = r"""
+            (to_date\s*\(\s*[^,]+\s*,\s*)  # 함수 이름과 첫 인자
+            (?:\'[^\']*\'|\"[^\"]*\")      # 포맷 문자열
+            (\s*\))                        # 닫는 괄호
+        """
+        to_date_pattern = re.compile(to_date_pattern, flags=re.IGNORECASE | re.VERBOSE)
+        
+        # to_char와 to_date 함수의 포맷 문자열을 'FORMAT'으로 일반화
         norm_expr = to_char_pattern.sub(r'\1\'FORMAT\'\2', norm_expr)
+        norm_expr = to_date_pattern.sub(r'\1\'FORMAT\'\2', norm_expr)
         
         return norm_expr
 
