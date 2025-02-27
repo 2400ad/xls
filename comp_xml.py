@@ -471,37 +471,46 @@ class XMLComparator:
             bw_queries (dict, optional): BW 쿼리 정보
             bw_files (list, optional): BW 파일 정보
         """
-        # 결과 데이터 구성
-        result_data = {
-            '송신 파일': {
-                '경로': file_results['send']['path'],
-                '쿼리': file_results['send']['query']
-            },
-            '수신 파일': {
-                '경로': file_results['recv']['path'], 
-                '쿼리': file_results['recv']['query']
-            }
+        # MQ 파일 정보 구성
+        mq_files = {
+            'send': {'path': file_results['send']['path']},
+            'recv': {'path': file_results['recv']['path']}
         }
         
-        # BW 파일 정보가 있는 경우 추가
-        if bw_queries:
-            result_data['BW 송신 파일'] = {
-                '경로': bw_files[0] if bw_files and len(bw_files) > 0 else '매핑파일없음',
-                '쿼리': bw_queries['send']
-            }
-            result_data['BW 수신 파일'] = {
-                '경로': bw_files[1] if bw_files and len(bw_files) > 1 else '매핑파일없음',
-                '쿼리': bw_queries['recv']
-            }
+        # BW 파일 정보 구성
+        bw_files_dict = {
+            'send': bw_files[0] if bw_files and len(bw_files) > 0 else '매핑파일없음',
+            'recv': bw_files[1] if bw_files and len(bw_files) > 1 else '매핑파일없음'
+        }
         
-        # 비교 결과 추가
-        result_data['비교 결과'] = {
-            '송신': '일치' if query_comparisons['send'] and query_comparisons['send'].is_equal else '차이',
-            '수신': '일치' if query_comparisons['recv'] and query_comparisons['recv'].is_equal else '차이'
+        # 쿼리 정보 구성
+        queries = {
+            'mq_send': file_results['send']['query'],
+            'mq_recv': file_results['recv']['query'],
+            'bw_send': bw_queries['send'] if bw_queries else 'N/A',
+            'bw_recv': bw_queries['recv'] if bw_queries else 'N/A'
+        }
+        
+        # 비교 결과 구성
+        comparison_results = {
+            'send': {
+                'is_equal': query_comparisons['send'].is_equal if query_comparisons['send'] else False,
+                'detail': query_comparisons['send'].detail if query_comparisons['send'] else 'N/A'
+            },
+            'recv': {
+                'is_equal': query_comparisons['recv'].is_equal if query_comparisons['recv'] else False,
+                'detail': query_comparisons['recv'].detail if query_comparisons['recv'] else 'N/A'
+            }
         }
         
         # ExcelManager를 사용하여 인터페이스 시트 생성
-        self.excel_manager.create_interface_sheet(if_info, result_data)
+        self.excel_manager.create_interface_sheet(
+            if_info, 
+            mq_files, 
+            bw_files_dict, 
+            queries, 
+            comparison_results
+        )
         
     def process_interface_with_bw(self, start_col: int, interface_info: Dict) -> Optional[Dict]:
         """
@@ -663,7 +672,7 @@ class XMLComparator:
         interface_count = 0
         processed_count = 0
         
-        start_col = 1
+        start_col = 2
         while True:
             interface_info = read_interface_block(self.worksheet, start_col)
             
@@ -729,72 +738,14 @@ class XMLComparator:
         
     def update_summary_sheet(self, result, row):
         """
-        요약 시트에 인터페이스 처리 결과 업데이트
+        요약 시트에 현재 인터페이스 처리 결과를 추가합니다.
         
         Args:
             result (dict): 인터페이스 처리 결과
-            row (int): 행 번호
+            row (int): 추가할 행 번호
         """
-        # 인터페이스 정보 가져오기
-        interface_info = result['interface_info']
-        if_id = interface_info.get('interface_id', '')
-        if_name = interface_info.get('interface_name', '')
-        
-        # 파일 결과 가져오기
-        file_results = result['file_results']
-        
-        # BW 파일 정보 가져오기
-        bw_files = result.get('bw_files', [])
-        
-        # BW 쿼리 가져오기
-        bw_queries = result.get('bw_queries', {'send': '', 'recv': ''})
-        
-        # 송신 쿼리 비교 결과 가져오기
-        send_comparison = result['comparisons']['send']
-        
-        # 수신 쿼리 비교 결과 가져오기
-        recv_comparison = result['comparisons']['recv']
-        
-        # 송신 테이블 정보
-        send_table = interface_info['send']['owner'] + '.' + interface_info['send']['table_name'] if interface_info['send']['owner'] and interface_info['send']['table_name'] else "매핑파일없음"
-        
-        # MQ 파일 정보
-        mq_send_file = os.path.basename(file_results['send']['path']) if file_results['send']['path'] else "매핑파일없음"
-        mq_recv_file = os.path.basename(file_results['recv']['path']) if file_results['recv']['path'] else "매핑파일없음"
-        
-        # BW 파일 정보
-        bw_send_file = "매핑파일없음"
-        if bw_queries['send'] and bw_files:
-            bw_send_file = bw_files[0]
-            
-        bw_recv_file = "매핑파일없음"
-        if bw_queries['recv'] and bw_files and len(bw_files) > 1:
-            bw_recv_file = bw_files[1]
-        
-        # 비교 결과
-        send_result = "일치" if send_comparison and send_comparison.is_equal else "차이"
-        if not send_comparison or not file_results['send']['query'] or not bw_queries['send']:
-            send_result = "비교불가"
-            
-        recv_result = "일치" if recv_comparison and recv_comparison.is_equal else "차이"
-        if not recv_comparison or not file_results['recv']['query'] or not bw_queries['recv']:
-            recv_result = "비교불가"
-        
-        # 요약 시트에 행 추가
-        summary_data = [
-            if_id, 
-            if_name,
-            send_table,
-            mq_send_file,
-            bw_send_file,
-            send_result,
-            mq_recv_file,
-            bw_recv_file,
-            recv_result
-        ]
-        
         # ExcelManager를 사용하여 요약 시트 업데이트
-        self.excel_manager.update_summary_sheet(summary_data, row)
+        self.excel_manager.update_summary_sheet(result, row)
 
     def extract_bw_queries(self, bw_results):
         """

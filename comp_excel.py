@@ -180,14 +180,16 @@ class ExcelManager:
             print(f"엑셀 파일 저장 중 오류 발생: {e}")
             return False
     
-    def create_interface_sheet(self, if_info, result_data, sheet_index=None):
+    def create_interface_sheet(self, if_info, mq_files=None, bw_files=None, queries=None, comparison_results=None):
         """
         엑셀 파일에 각 인터페이스별 시트를 생성하고, 데이터를 기록
         
         Args:
             if_info (dict): 인터페이스 정보
-            result_data (dict): 결과 데이터
-            sheet_index (int, optional): 시트 인덱스 (없으면 자동 생성)
+            mq_files (dict): MQ 파일 정보 (송신/수신)
+            bw_files (dict): BW 파일 정보 (송신/수신)
+            queries (dict): 쿼리 정보 (MQ/BW, 송신/수신)
+            comparison_results (dict): 비교 결과
         """
         # 시트 이름 생성 (인터페이스 이름 또는 ID)
         sheet_name = if_info.get('interface_name', '') or if_info.get('interface_id', '')
@@ -219,43 +221,114 @@ class ExcelManager:
         
         # 열 너비 설정
         for col in range(1, 10):
-            sheet.column_dimensions[get_column_letter(col)].width = 15
+            sheet.column_dimensions[get_column_letter(col)].width = 20
         
         # 인터페이스 정보 헤더 설정
         sheet.cell(row=1, column=1, value="인터페이스 정보").font = Font(bold=True)
+        sheet.merge_cells(start_row=1, start_column=1, end_row=1, end_column=4)
         sheet.cell(row=1, column=1).fill = header_fill
+        sheet.cell(row=1, column=1).alignment = align_center
         
         # 인터페이스 정보 내용 채우기
         sheet.cell(row=2, column=1, value="인터페이스 ID").font = Font(bold=True)
         sheet.cell(row=2, column=2, value=if_info.get('interface_id', ''))
+        sheet.cell(row=2, column=3, value="인터페이스 명").font = Font(bold=True)
+        sheet.cell(row=2, column=4, value=if_info.get('interface_name', ''))
         
-        sheet.cell(row=3, column=1, value="인터페이스 명").font = Font(bold=True)
-        sheet.cell(row=3, column=2, value=if_info.get('interface_name', ''))
+        # 송신 테이블 정보
+        sheet.cell(row=3, column=1, value="송신 시스템").font = Font(bold=True)
+        sheet.cell(row=3, column=2, value=if_info.get('send_system', 'N/A'))
+        sheet.cell(row=3, column=3, value="송신 테이블").font = Font(bold=True)
+        sheet.cell(row=3, column=4, value=if_info.get('send', {}).get('table_name', 'N/A'))
         
-        # 결과 데이터 채우기 - 이 부분은 호출자에 따라 맞춰서 구현 가능
+        # 결과 헤더 행 추가
         row = 5
-        for key, value in result_data.items():
-            if isinstance(value, dict):
-                sheet.cell(row=row, column=1, value=key).font = Font(bold=True)
-                row += 1
-                for sub_key, sub_value in value.items():
-                    sheet.cell(row=row, column=1, value=sub_key)
-                    if isinstance(sub_value, str) and len(sub_value) > 100:
-                        # 긴 문자열은 여러 줄로 나누어 표시
-                        sheet.cell(row=row, column=2, value=sub_value)
-                        sheet.cell(row=row, column=2).alignment = Alignment(wrap_text=True)
-                    else:
-                        sheet.cell(row=row, column=2, value=str(sub_value))
-                    row += 1
-            else:
-                sheet.cell(row=row, column=1, value=key).font = Font(bold=True)
-                sheet.cell(row=row, column=2, value=str(value))
-                row += 1
-                
-        # 모든 셀에 테두리 적용
-        for row_cells in sheet.iter_rows(min_row=1, max_row=row-1, min_col=1, max_col=2):
-            for cell in row_cells:
-                cell.border = border
+        header_row = row
+        headers = [
+            "구분", "MQ 송신 파일", "BW 송신 파일", "MQ 수신 파일", "BW 수신 파일"
+        ]
+        
+        for col, header in enumerate(headers, 1):
+            cell = sheet.cell(row=header_row, column=col, value=header)
+            cell.font = Font(bold=True)
+            cell.fill = header_fill
+            cell.alignment = align_center
+            cell.border = border
+        
+        # 파일 이름 행
+        row += 1
+        if mq_files and bw_files:
+            sheet.cell(row=row, column=1, value="파일명").font = Font(bold=True)
+            sheet.cell(row=row, column=2, value=mq_files.get('send', {}).get('path', 'N/A'))
+            sheet.cell(row=row, column=3, value=bw_files.get('send', 'N/A'))
+            sheet.cell(row=row, column=4, value=mq_files.get('recv', {}).get('path', 'N/A'))
+            sheet.cell(row=row, column=5, value=bw_files.get('recv', 'N/A'))
+            
+            for col in range(1, 6):
+                sheet.cell(row=row, column=col).border = border
+                sheet.cell(row=row, column=col).alignment = align_left
+        
+        # 쿼리 행
+        row += 1
+        if queries:
+            sheet.cell(row=row, column=1, value="SQL 쿼리").font = Font(bold=True)
+            sheet.cell(row=row, column=2, value=queries.get('mq_send', 'N/A'))
+            sheet.cell(row=row, column=3, value=queries.get('bw_send', 'N/A'))
+            sheet.cell(row=row, column=4, value=queries.get('mq_recv', 'N/A'))
+            sheet.cell(row=row, column=5, value=queries.get('bw_recv', 'N/A'))
+            
+            # 쿼리 셀에 텍스트 줄바꿈 설정
+            for col in range(1, 6):
+                sheet.cell(row=row, column=col).border = border
+                sheet.cell(row=row, column=col).alignment = Alignment(wrap_text=True, vertical='top')
+                sheet.row_dimensions[row].height = 150  # 쿼리 행 높이 설정
+        
+        # 비교 결과 행
+        row += 1
+        if comparison_results:
+            sheet.cell(row=row, column=1, value="비교 결과").font = Font(bold=True)
+            
+            # 송신 비교 결과
+            send_result = "일치" if comparison_results.get('send', {}).get('is_equal', False) else "차이"
+            sheet.merge_cells(start_row=row, start_column=2, end_row=row, end_column=3)
+            cell = sheet.cell(row=row, column=2, value=send_result)
+            cell.alignment = align_center
+            
+            # 수신 비교 결과
+            recv_result = "일치" if comparison_results.get('recv', {}).get('is_equal', False) else "차이"
+            sheet.merge_cells(start_row=row, start_column=4, end_row=row, end_column=5)
+            cell = sheet.cell(row=row, column=4, value=recv_result)
+            cell.alignment = align_center
+            
+            # 테두리 적용
+            for col in range(1, 6):
+                if col != 3 and col != 5:  # 병합된 셀 제외
+                    sheet.cell(row=row, column=col).border = border
+        
+        # 비교 결과 상세 행
+        row += 1
+        if comparison_results:
+            sheet.cell(row=row, column=1, value="상세 내역").font = Font(bold=True)
+            
+            # 송신 비교 결과 상세
+            sheet.merge_cells(start_row=row, start_column=2, end_row=row, end_column=3)
+            send_detail = comparison_results.get('send', {}).get('detail', 'N/A')
+            cell = sheet.cell(row=row, column=2, value=send_detail)
+            cell.alignment = Alignment(wrap_text=True, vertical='top')
+            
+            # 수신 비교 결과 상세
+            sheet.merge_cells(start_row=row, start_column=4, end_row=row, end_column=5)
+            recv_detail = comparison_results.get('recv', {}).get('detail', 'N/A')
+            cell = sheet.cell(row=row, column=4, value=recv_detail)
+            cell.alignment = Alignment(wrap_text=True, vertical='top')
+            
+            # 테두리 적용
+            for col in range(1, 6):
+                if col != 3 and col != 5:  # 병합된 셀 제외
+                    sheet.cell(row=row, column=col).border = border
+            
+            # 상세 내역 행 높이 설정
+            sheet.row_dimensions[row].height = 100
         
         return sheet
     
@@ -284,24 +357,58 @@ class ExcelManager:
         align_center = Alignment(horizontal='center', vertical='center', wrap_text=True)
         align_left = Alignment(horizontal='left', vertical='center', wrap_text=True)
         
-        # 각 열에 데이터 채우기 (호출자에 맞게 조정 가능)
-        for col, value in enumerate(result, 1):
+        # 인터페이스 정보
+        interface_info = result.get('interface_info', {})
+        interface_id = interface_info.get('interface_id', '')
+        interface_name = interface_info.get('interface_name', '')
+        send_table = interface_info.get('send', {}).get('table_name', '')
+        
+        # 파일 정보
+        file_results = result.get('file_results', {})
+        mq_send_file = file_results.get('send', {}).get('path', 'N/A')
+        mq_recv_file = file_results.get('recv', {}).get('path', 'N/A')
+        
+        # BW 파일 및 쿼리 정보
+        bw_files = result.get('bw_files', [])
+        bw_queries = result.get('bw_queries', {'send': '', 'recv': ''})
+        
+        bw_send_file = "매핑파일없음"
+        if bw_files and len(bw_files) > 0:
+            bw_send_file = bw_files[0]
+            
+        bw_recv_file = "매핑파일없음"
+        if bw_files and len(bw_files) > 1:
+            bw_recv_file = bw_files[1]
+        
+        # 비교 결과
+        comparisons = result.get('comparisons', {'send': None, 'recv': None})
+        send_comparison = comparisons.get('send')
+        recv_comparison = comparisons.get('recv')
+        
+        send_result = '일치' if send_comparison and send_comparison.is_equal else '차이'
+        recv_result = '일치' if recv_comparison and recv_comparison.is_equal else '차이'
+        
+        # 요약 데이터 구성
+        summary_data = [
+            interface_id,
+            interface_name,
+            send_table,
+            mq_send_file,
+            bw_send_file,
+            send_result,
+            mq_recv_file,
+            bw_recv_file,
+            recv_result
+        ]
+        
+        # 데이터 채우기
+        for col, value in enumerate(summary_data, 1):
             cell = summary_sheet.cell(row=row, column=col, value=value)
             cell.border = border
-            
-            # 가운데 정렬 또는 왼쪽 정렬 설정
-            if col in [1, 6, 9]:  # ID와 비교 결과 열은 가운데 정렬
-                cell.alignment = align_center
-            else:
+            if col in [1, 2, 3]:
                 cell.alignment = align_left
-            
-            # 비교 결과에 따른 색상 설정
-            if col in [6, 9] and value == "일치":
-                cell.fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
-            elif col in [6, 9] and value == "차이":
-                cell.fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
-            elif col in [6, 9] and value == "비교불가":
-                cell.fill = PatternFill(start_color="DDDDDD", end_color="DDDDDD", fill_type="solid")
+            else:
+                cell.alignment = align_center
     
     def close(self):
         """
@@ -322,7 +429,10 @@ def main():
     sheet = excel_manager.initialize_excel_output()
     
     # 샘플 데이터로 요약 시트 업데이트
-    sample_data = ["IF001", "테스트 인터페이스", "TEST_TABLE", "test.SND.xml", "test.xml", "일치", "test.RCV.xml", "test.xml", "차이"]
+    sample_data = {"interface_info": {"interface_id": "IF001", "interface_name": "테스트 인터페이스", "send": {"table_name": "TEST_TABLE"}}, 
+                   "file_results": {"send": {"path": "test.SND.xml"}, "recv": {"path": "test.RCV.xml"}}, 
+                   "bw_files": ["test.xml", "test.xml"], 
+                   "comparisons": {"send": {"is_equal": True}, "recv": {"is_equal": False}}}
     excel_manager.update_summary_sheet(sample_data, 2)
     
     # 샘플 인터페이스 시트 생성
@@ -331,18 +441,29 @@ def main():
         'interface_name': '테스트 인터페이스'
     }
     
-    result_data = {
-        '송신 파일': {
-            '경로': 'test.SND.xml',
-            '쿼리': 'SELECT * FROM TEST_TABLE'
-        },
-        '수신 파일': {
-            '경로': 'test.RCV.xml', 
-            '쿼리': 'INSERT INTO TEST_TABLE'
-        }
+    mq_files = {
+        'send': {'path': 'test.SND.xml'},
+        'recv': {'path': 'test.RCV.xml'}
     }
     
-    excel_manager.create_interface_sheet(if_info, result_data)
+    bw_files = {
+        'send': 'test.xml',
+        'recv': 'test.xml'
+    }
+    
+    queries = {
+        'mq_send': 'SELECT * FROM TEST_TABLE',
+        'bw_send': 'INSERT INTO TEST_TABLE',
+        'mq_recv': 'SELECT * FROM TEST_TABLE',
+        'bw_recv': 'INSERT INTO TEST_TABLE'
+    }
+    
+    comparison_results = {
+        'send': {'is_equal': True, 'detail': '일치'},
+        'recv': {'is_equal': False, 'detail': '차이'}
+    }
+    
+    excel_manager.create_interface_sheet(if_info, mq_files, bw_files, queries, comparison_results)
     
     # 파일 저장
     excel_manager.save_excel_output('test_output.xlsx')
