@@ -215,6 +215,10 @@ class ExcelManager:
         if isinstance(send_comparison, str):
             # "일치" 또는 "불일치" 문자열 그대로 사용
             cell = sheet.cell(row=row, column=7, value=send_comparison)
+        # QueryDifference 클래스 인스턴스인 경우
+        elif hasattr(send_comparison, "is_equal") and not isinstance(send_comparison, dict):
+            # QueryDifference 클래스의 __str__ 메서드 사용하여 "일치" 또는 "불일치" 가져오기
+            cell = sheet.cell(row=row, column=7, value=str(send_comparison))
         # 딕셔너리인 경우 확인
         elif isinstance(send_comparison, dict):
             if "is_equal" in send_comparison:
@@ -250,6 +254,10 @@ class ExcelManager:
         if isinstance(recv_comparison, str):
             # "일치" 또는 "불일치" 문자열 그대로 사용
             cell = sheet.cell(row=row, column=10, value=recv_comparison)
+        # QueryDifference 클래스 인스턴스인 경우
+        elif hasattr(recv_comparison, "is_equal") and not isinstance(recv_comparison, dict):
+            # QueryDifference 클래스의 __str__ 메서드 사용하여 "일치" 또는 "불일치" 가져오기
+            cell = sheet.cell(row=row, column=10, value=str(recv_comparison))
         # 딕셔너리인 경우 확인
         elif isinstance(recv_comparison, dict):
             if "is_equal" in recv_comparison:
@@ -315,17 +323,19 @@ class ExcelManager:
         sheet_name = if_info.get('interface_name', '') or if_info.get('interface_id', '')
         
         # 일련번호 찾기
-        seq_num = '01'  # 기본값
+        seq_num = None  # 기본값을 None으로 설정
         if "요약" in self.workbook.sheetnames:
             summary_sheet = self.workbook["요약"]
             for row in range(2, summary_sheet.max_row + 1):
                 interface_id = summary_sheet.cell(row=row, column=2).value
                 if interface_id == if_info.get('interface_id', ''):
+                    # 요약 시트에서 해당 인터페이스의 일련번호를 가져옴
                     seq_num = summary_sheet.cell(row=row, column=1).value
                     break
         
-        # 시트 이름 앞에 일련번호 추가
-        sheet_name = f"{seq_num}_{sheet_name}"
+        # 시트 이름 앞에 일련번호를 붙임 (있는 경우에만)
+        if seq_num:
+            sheet_name = f"{seq_num}_{sheet_name}"
         
         # 시트 이름이 30자를 초과하면 자르기 (Excel 시트 이름 제한)
         if len(sheet_name) > 30:
