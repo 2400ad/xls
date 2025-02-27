@@ -231,23 +231,27 @@ class ExcelManager:
         align_left = Alignment(horizontal='left', vertical='center', wrap_text=True)
         wrap_text_top = Alignment(wrap_text=True, vertical='top')
         
-        # 열 너비 설정 - 모든 열을 A열과 동일하게 설정
-        column_width = 15  # A열의 기본 너비
+        # 열 너비 설정 - 모든 열을 A열과 동일하게 설정하고 2배 크기로 확장
+        column_width = 30  # A열의 기본 너비의 2배
         for col_letter in ['A', 'B', 'C', 'D', 'E', 'F']:
             sheet.column_dimensions[col_letter].width = column_width
+            
+        # 기본 글꼴 크기 설정
+        font_size_normal = 10
+        font_size_query = 9
         
         # 1. 인터페이스 정보 헤더 설정
         row = 1
-        sheet.cell(row=row, column=1, value="인터페이스 정보").font = Font(bold=True)
+        sheet.cell(row=row, column=1, value="인터페이스 정보").font = Font(bold=True, size=font_size_normal)
         sheet.merge_cells(start_row=row, start_column=1, end_row=row, end_column=5)
         sheet.cell(row=row, column=1).fill = header_fill
         sheet.cell(row=row, column=1).alignment = align_center
         
         # 인터페이스 ID 및 이름
         row = 2
-        sheet.cell(row=row, column=1, value="인터페이스 ID").font = Font(bold=True)
+        sheet.cell(row=row, column=1, value="인터페이스 ID").font = Font(bold=True, size=font_size_normal)
         sheet.cell(row=row, column=2, value=if_info.get('interface_id', ''))
-        sheet.cell(row=row, column=3, value="인터페이스 명").font = Font(bold=True)
+        sheet.cell(row=row, column=3, value="인터페이스 명").font = Font(bold=True, size=font_size_normal)
         sheet.cell(row=row, column=4, value=if_info.get('interface_name', ''))
         sheet.merge_cells(start_row=row, start_column=4, end_row=row, end_column=5)
         
@@ -264,9 +268,9 @@ class ExcelManager:
             else:
                 send_sid = sid_full
                 
-        sheet.cell(row=row, column=1, value="송신 시스템").font = Font(bold=True)
+        sheet.cell(row=row, column=1, value="송신 시스템").font = Font(bold=True, size=font_size_normal)
         sheet.cell(row=row, column=2, value=send_sid)
-        sheet.cell(row=row, column=3, value="송신 테이블").font = Font(bold=True)
+        sheet.cell(row=row, column=3, value="송신 테이블").font = Font(bold=True, size=font_size_normal)
         
         send_owner = if_info.get('send', {}).get('owner', '')
         send_table = if_info.get('send', {}).get('table_name', '')
@@ -288,9 +292,9 @@ class ExcelManager:
             else:
                 recv_sid = sid_full
                 
-        sheet.cell(row=row, column=1, value="수신 시스템").font = Font(bold=True)
+        sheet.cell(row=row, column=1, value="수신 시스템").font = Font(bold=True, size=font_size_normal)
         sheet.cell(row=row, column=2, value=recv_sid)
-        sheet.cell(row=row, column=3, value="수신 테이블").font = Font(bold=True)
+        sheet.cell(row=row, column=3, value="수신 테이블").font = Font(bold=True, size=font_size_normal)
         
         recv_owner = if_info.get('recv', {}).get('owner', '')
         recv_table = if_info.get('recv', {}).get('table_name', '')
@@ -303,14 +307,14 @@ class ExcelManager:
         row = 6
         
         # 2.1 송신 파일 정보
-        sheet.cell(row=row, column=1, value="송신 파일명").font = Font(bold=True)
+        sheet.cell(row=row, column=1, value="송신 파일명").font = Font(bold=True, size=font_size_normal)
         sheet.cell(row=row, column=1).fill = header_fill
         
-        sheet.cell(row=row, column=2, value="MQ 송신 파일").font = Font(bold=True)
+        sheet.cell(row=row, column=2, value="MQ 송신 파일").font = Font(bold=True, size=font_size_normal)
         sheet.cell(row=row, column=2).fill = header_fill
         sheet.cell(row=row, column=2).alignment = align_center
         
-        sheet.cell(row=row, column=4, value="BW 송신 파일").font = Font(bold=True)
+        sheet.cell(row=row, column=4, value="BW 송신 파일").font = Font(bold=True, size=font_size_normal)
         sheet.cell(row=row, column=4).fill = header_fill
         sheet.cell(row=row, column=4).alignment = align_center
         
@@ -324,14 +328,14 @@ class ExcelManager:
         
         # 2.2 수신 파일 정보
         row = 8
-        sheet.cell(row=row, column=1, value="수신 파일명").font = Font(bold=True)
+        sheet.cell(row=row, column=1, value="수신 파일명").font = Font(bold=True, size=font_size_normal)
         sheet.cell(row=row, column=1).fill = header_fill
         
-        sheet.cell(row=row, column=2, value="MQ 수신 파일").font = Font(bold=True)
+        sheet.cell(row=row, column=2, value="MQ 수신 파일").font = Font(bold=True, size=font_size_normal)
         sheet.cell(row=row, column=2).fill = header_fill
         sheet.cell(row=row, column=2).alignment = align_center
         
-        sheet.cell(row=row, column=4, value="BW 수신 파일").font = Font(bold=True)
+        sheet.cell(row=row, column=4, value="BW 수신 파일").font = Font(bold=True, size=font_size_normal)
         sheet.cell(row=row, column=4).fill = header_fill
         sheet.cell(row=row, column=4).alignment = align_center
         
@@ -345,21 +349,21 @@ class ExcelManager:
         
         # 2.3 송신 쿼리 및 비교 결과
         row = 11
-        sheet.cell(row=row, column=1, value="송신 MQ 쿼리").font = Font(bold=True)
+        sheet.cell(row=row, column=1, value="송신 MQ 쿼리").font = Font(bold=True, size=font_size_normal)
         sheet.cell(row=row, column=1).fill = header_fill
         sheet.cell(row=row, column=1).alignment = align_center
         sheet.merge_cells(start_row=row, start_column=1, end_row=row, end_column=2)
         
-        sheet.cell(row=row, column=3, value="송신 BW 쿼리").font = Font(bold=True)
+        sheet.cell(row=row, column=3, value="송신 BW 쿼리").font = Font(bold=True, size=font_size_normal)
         sheet.cell(row=row, column=3).fill = header_fill
         sheet.cell(row=row, column=3).alignment = align_center
         sheet.merge_cells(start_row=row, start_column=3, end_row=row, end_column=4)
         
-        sheet.cell(row=row, column=5, value="비교").font = Font(bold=True)
+        sheet.cell(row=row, column=5, value="비교").font = Font(bold=True, size=font_size_normal)
         sheet.cell(row=row, column=5).fill = header_fill
         sheet.cell(row=row, column=5).alignment = align_center
         
-        sheet.cell(row=row, column=6, value="비교 상세").font = Font(bold=True)
+        sheet.cell(row=row, column=6, value="비교 상세").font = Font(bold=True, size=font_size_normal)
         sheet.cell(row=row, column=6).fill = header_fill
         sheet.cell(row=row, column=6).alignment = align_center
         
@@ -367,10 +371,12 @@ class ExcelManager:
         row = 12
         sheet.cell(row=row, column=1, value=mq_files.get('send', {}).get('query', queries.get('mq_send', 'N/A')))
         sheet.cell(row=row, column=1).alignment = wrap_text_top
+        sheet.cell(row=row, column=1).font = Font(size=font_size_query)
         sheet.merge_cells(start_row=row, start_column=1, end_row=row, end_column=2)
         
         sheet.cell(row=row, column=3, value=queries.get('bw_send', 'N/A'))
         sheet.cell(row=row, column=3).alignment = wrap_text_top
+        sheet.cell(row=row, column=3).font = Font(size=font_size_query)
         sheet.merge_cells(start_row=row, start_column=3, end_row=row, end_column=4)
         
         # 비교 결과 입력
@@ -399,21 +405,21 @@ class ExcelManager:
         
         # 2.4 수신 쿼리 및 비교 결과
         row = 14
-        sheet.cell(row=row, column=1, value="수신 MQ 쿼리").font = Font(bold=True)
+        sheet.cell(row=row, column=1, value="수신 MQ 쿼리").font = Font(bold=True, size=font_size_normal)
         sheet.cell(row=row, column=1).fill = header_fill
         sheet.cell(row=row, column=1).alignment = align_center
         sheet.merge_cells(start_row=row, start_column=1, end_row=row, end_column=2)
         
-        sheet.cell(row=row, column=3, value="수신 BW 쿼리").font = Font(bold=True)
+        sheet.cell(row=row, column=3, value="수신 BW 쿼리").font = Font(bold=True, size=font_size_normal)
         sheet.cell(row=row, column=3).fill = header_fill
         sheet.cell(row=row, column=3).alignment = align_center
         sheet.merge_cells(start_row=row, start_column=3, end_row=row, end_column=4)
         
-        sheet.cell(row=row, column=5, value="비교").font = Font(bold=True)
+        sheet.cell(row=row, column=5, value="비교").font = Font(bold=True, size=font_size_normal)
         sheet.cell(row=row, column=5).fill = header_fill
         sheet.cell(row=row, column=5).alignment = align_center
         
-        sheet.cell(row=row, column=6, value="비교 상세").font = Font(bold=True)
+        sheet.cell(row=row, column=6, value="비교 상세").font = Font(bold=True, size=font_size_normal)
         sheet.cell(row=row, column=6).fill = header_fill
         sheet.cell(row=row, column=6).alignment = align_center
         
@@ -421,10 +427,12 @@ class ExcelManager:
         row = 15
         sheet.cell(row=row, column=1, value=mq_files.get('recv', {}).get('query', queries.get('mq_recv', 'N/A')))
         sheet.cell(row=row, column=1).alignment = wrap_text_top
+        sheet.cell(row=row, column=1).font = Font(size=font_size_query)
         sheet.merge_cells(start_row=row, start_column=1, end_row=row, end_column=2)
         
         sheet.cell(row=row, column=3, value=queries.get('bw_recv', 'N/A'))
         sheet.cell(row=row, column=3).alignment = wrap_text_top
+        sheet.cell(row=row, column=3).font = Font(size=font_size_query)
         sheet.merge_cells(start_row=row, start_column=3, end_row=row, end_column=4)
         
         # 비교 결과 입력
