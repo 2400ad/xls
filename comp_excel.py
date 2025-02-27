@@ -660,7 +660,7 @@ class ExcelManager:
         
         sheet.cell(row=row, column=6, value=recv_detail)
         sheet.cell(row=row, column=6).alignment = wrap_text_top
-dl         
+        
         # 쿼리 행 높이 설정
         sheet.row_dimensions[row].height = 150
         
