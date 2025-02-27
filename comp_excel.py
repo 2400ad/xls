@@ -105,9 +105,6 @@ class ExcelManager:
         self.match_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")  # 녹색
         self.mismatch_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")  # 빨간색
         self.unavailable_fill = PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid")  # 노란색
-        
-        # 인터페이스 ID와 일련번호 매핑을 저장하는 딕셔너리
-        self.interface_id_map = {}
 
     def initialize_excel_output(self):
         """
@@ -199,11 +196,6 @@ class ExcelManager:
         
         cell = sheet.cell(row=row, column=2, value=interface_info.get("interface_id", ""))
         cell.font = font_normal
-        
-        # 인터페이스 ID와 일련번호 매핑 저장 (인터페이스 ID 설정 직후에 추가)
-        self.interface_id_map[interface_info.get("interface_id", "")] = seq_num_formatted
-        print(f"[디버깅] 매핑 정보 업데이트 - ID: {interface_info.get('interface_id', '')}, 일련번호: {seq_num_formatted}")
-        print(f"[디버깅] 현재 매핑 정보: {self.interface_id_map}")
         
         cell = sheet.cell(row=row, column=3, value=interface_info.get("interface_name", ""))
         cell.font = font_normal
@@ -393,18 +385,25 @@ class ExcelManager:
         # 시트 이름 생성 (인터페이스 이름 또는 ID)
         sheet_name = if_info.get('interface_name', '') or if_info.get('interface_id', '')
         
-        # 일련번호 찾기
+        # 일련번호 찾기 - 요약 시트에서 직접 찾기
+        seq_num = None
         interface_id = if_info.get('interface_id', '')
-        seq_num = self.interface_id_map.get(interface_id)  # None이 기본값
-        print(f"[디버깅] 인터페이스 시트 생성 - ID: {interface_id}, 일련번호: {seq_num}")
-        print(f"[디버깅] 현재 매핑 정보: {self.interface_id_map}")
+        
+        if "요약" in self.workbook.sheetnames:
+            summary_sheet = self.workbook["요약"]
+            
+            # 요약 시트에서 모든 행을 순회하며 해당 인터페이스 ID 찾기
+            for row_idx in range(2, summary_sheet.max_row + 1):
+                cell_interface_id = summary_sheet.cell(row=row_idx, column=2).value
+                
+                if cell_interface_id == interface_id:
+                    # 일련번호 찾음
+                    seq_num = summary_sheet.cell(row=row_idx, column=1).value
+                    break
         
         # 시트 이름 앞에 일련번호를 붙임 (있는 경우에만)
         if seq_num:
             sheet_name = f"{seq_num}_{sheet_name}"
-            print(f"[디버깅] 일련번호가 추가된 시트 이름: {sheet_name}")
-        else:
-            print(f"[디버깅] 일련번호를 찾을 수 없어 원래 시트 이름 사용: {sheet_name}")
         
         # 시트 이름이 30자를 초과하면 자르기 (Excel 시트 이름 제한)
         if len(sheet_name) > 30:
@@ -661,7 +660,7 @@ class ExcelManager:
         
         sheet.cell(row=row, column=6, value=recv_detail)
         sheet.cell(row=row, column=6).alignment = wrap_text_top
-        
+dl         
         # 쿼리 행 높이 설정
         sheet.row_dimensions[row].height = 150
         
@@ -842,11 +841,6 @@ def main():
         'send': {'path': 'test2.SND.xml', 'query': 'SELECT * FROM OWNER2.TEST_TABLE2 WHERE 1=1'},
         'recv': {'path': 'test2.RCV.xml', 'query': 'SELECT * FROM OWNER2.TEST_RCV_TABLE2 WHERE status = \'Y\''}
     }
-    
-    # 인터페이스 ID와 일련번호 매핑 정보 출력
-    print("\n=== 인터페이스 ID와 일련번호 매핑 ===")
-    for if_id, seq_num in excel_manager.interface_id_map.items():
-        print(f"인터페이스 ID: {if_id}, 일련번호: {seq_num}")
     
     # 두 번째 인터페이스 시트 생성
     excel_manager.create_interface_sheet(if_info2, mq_files2, bw_files, queries, comparison_results)
