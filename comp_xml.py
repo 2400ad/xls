@@ -504,11 +504,11 @@ class XMLComparator:
         comparison_results = {
             'send': {
                 'is_equal': query_comparisons.get('send', QueryDifference()).is_equal,
-                'detail': query_comparisons.get('send', QueryDifference()).detail
+                'detail': self._get_difference_detail(query_comparisons.get('send', QueryDifference()))
             },
             'recv': {
                 'is_equal': query_comparisons.get('recv', QueryDifference()).is_equal,
-                'detail': query_comparisons.get('recv', QueryDifference()).detail
+                'detail': self._get_difference_detail(query_comparisons.get('recv', QueryDifference()))
             }
         }
         
@@ -725,11 +725,11 @@ class XMLComparator:
                 comparison_results = {
                     'send': {
                         'is_equal': result['comparisons']['send'].is_equal if result['comparisons']['send'] else False,
-                        'detail': result['comparisons']['send'].detail if result['comparisons']['send'] else '비교 불가'
+                        'detail': self._get_difference_detail(result['comparisons']['send']) if result['comparisons']['send'] else '비교 불가'
                     },
                     'recv': {
                         'is_equal': result['comparisons']['recv'].is_equal if result['comparisons']['recv'] else False,
-                        'detail': result['comparisons']['recv'].detail if result['comparisons']['recv'] else '비교 불가'
+                        'detail': self._get_difference_detail(result['comparisons']['recv']) if result['comparisons']['recv'] else '비교 불가'
                     }
                 }
                 
@@ -817,6 +817,34 @@ class XMLComparator:
                 })
         
         return results
+
+    def _get_difference_detail(self, query_diff):
+        """
+        쿼리 차이점을 텍스트로 변환합니다.
+        
+        Args:
+            query_diff (QueryDifference): 쿼리 차이점
+        
+        Returns:
+            str: 차이점 텍스트
+        """
+        if not query_diff:
+            return ''
+        
+        if query_diff.is_equal:
+            return '일치 - 테이블과 칼럼이 모두 동일합니다.'
+        
+        # 차이점 텍스트 생성
+        detail = '차이 - 다음과 같은 차이점이 발견되었습니다:\n'
+        for diff in query_diff.differences:
+            column = diff.get('column', 'N/A')
+            query1_value = diff.get('query1_value', 'N/A')
+            query2_value = diff.get('query2_value', 'N/A')
+            detail += f'- 컬럼: {column}\n'
+            detail += f'  · MQ: {query1_value}\n'
+            detail += f'  · BW: {query2_value}\n'
+        
+        return detail
 
 def main():
     # 고정된 경로 사용
