@@ -156,7 +156,7 @@ class ExcelManager:
         
         for col_idx, header in enumerate(headers, 1):
             cell = sheet.cell(row=1, column=col_idx, value=header)
-            cell.font = Font(bold=True)
+            cell.font = Font(bold=True, size=10)
             cell.fill = header_fill
             cell.alignment = align_center
             cell.border = border
@@ -233,9 +233,12 @@ class ExcelManager:
         
         # 열 너비 설정 - 모든 열을 A열과 동일하게 설정하고 2배 크기로 확장
         column_width = 30  # A열의 기본 너비의 2배
-        for col_letter in ['A', 'B', 'C', 'D', 'E', 'F']:
+        for col_letter in ['A', 'B', 'C', 'D', 'F']:
             sheet.column_dimensions[col_letter].width = column_width
-            
+        
+        # E열은 다른 열의 절반 크기로 설정
+        sheet.column_dimensions['E'].width = column_width / 2
+        
         # 기본 글꼴 크기 설정
         font_size_normal = 10
         font_size_query = 9
@@ -488,8 +491,8 @@ class ExcelManager:
             top=Side(style='thin'),
             bottom=Side(style='thin')
         )
-        align_center = Alignment(horizontal='center', vertical='center', wrap_text=True)
-        align_left = Alignment(horizontal='left', vertical='center', wrap_text=True)
+        align_center = Alignment(horizontal='center', vertical='center')
+        align_left = Alignment(horizontal='left', vertical='center')
         wrap_text_top = Alignment(wrap_text=True, vertical='top')
         
         # 인터페이스 정보
@@ -553,6 +556,7 @@ class ExcelManager:
         for col, value in enumerate(summary_data, 1):
             cell = summary_sheet.cell(row=row, column=col, value=value)
             cell.border = border
+            cell.font = Font(size=10)
             if col in [1, 2, 3]:
                 cell.alignment = align_left
             else:
