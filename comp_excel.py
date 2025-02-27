@@ -211,12 +211,13 @@ class ExcelManager:
         
         # 비교 결과 - 송신
         send_comparison = comparisons.get("send", {})
-        if isinstance(send_comparison, dict):
-            # 문자열 결과를 확인하여 처리
-            if isinstance(send_comparison, str):
-                # "일치" 또는 "불일치" 문자열 그대로 사용
-                cell = sheet.cell(row=row, column=7, value=send_comparison)
-            elif "is_equal" in send_comparison:
+        # 문자열인 경우 먼저 확인
+        if isinstance(send_comparison, str):
+            # "일치" 또는 "불일치" 문자열 그대로 사용
+            cell = sheet.cell(row=row, column=7, value=send_comparison)
+        # 딕셔너리인 경우 확인
+        elif isinstance(send_comparison, dict):
+            if "is_equal" in send_comparison:
                 is_equal = send_comparison.get("is_equal", False)
                 cell = sheet.cell(row=row, column=7, value="일치" if is_equal else "불일치")
             # 또는 "detail" 필드가 있을 경우
@@ -245,12 +246,13 @@ class ExcelManager:
         
         # 비교 결과 - 수신
         recv_comparison = comparisons.get("recv", {})
-        if isinstance(recv_comparison, dict):
-            # 문자열 결과를 확인하여 처리
-            if isinstance(recv_comparison, str):
-                # "일치" 또는 "불일치" 문자열 그대로 사용
-                cell = sheet.cell(row=row, column=10, value=recv_comparison)
-            elif "is_equal" in recv_comparison:
+        # 문자열인 경우 먼저 확인
+        if isinstance(recv_comparison, str):
+            # "일치" 또는 "불일치" 문자열 그대로 사용
+            cell = sheet.cell(row=row, column=10, value=recv_comparison)
+        # 딕셔너리인 경우 확인
+        elif isinstance(recv_comparison, dict):
+            if "is_equal" in recv_comparison:
                 is_equal = recv_comparison.get("is_equal", False)
                 cell = sheet.cell(row=row, column=10, value="일치" if is_equal else "불일치")
             # 또는 "detail" 필드가 있을 경우
