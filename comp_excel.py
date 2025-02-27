@@ -202,6 +202,8 @@ class ExcelManager:
         
         # 인터페이스 ID와 일련번호 매핑 저장 (인터페이스 ID 설정 직후에 추가)
         self.interface_id_map[interface_info.get("interface_id", "")] = seq_num_formatted
+        print(f"[디버깅] 매핑 정보 업데이트 - ID: {interface_info.get('interface_id', '')}, 일련번호: {seq_num_formatted}")
+        print(f"[디버깅] 현재 매핑 정보: {self.interface_id_map}")
         
         cell = sheet.cell(row=row, column=3, value=interface_info.get("interface_name", ""))
         cell.font = font_normal
@@ -393,13 +395,16 @@ class ExcelManager:
         
         # 일련번호 찾기
         interface_id = if_info.get('interface_id', '')
-        seq_num = self.interface_id_map.get(interface_id, '')
+        seq_num = self.interface_id_map.get(interface_id)  # None이 기본값
         print(f"[디버깅] 인터페이스 시트 생성 - ID: {interface_id}, 일련번호: {seq_num}")
         print(f"[디버깅] 현재 매핑 정보: {self.interface_id_map}")
         
         # 시트 이름 앞에 일련번호를 붙임 (있는 경우에만)
         if seq_num:
             sheet_name = f"{seq_num}_{sheet_name}"
+            print(f"[디버깅] 일련번호가 추가된 시트 이름: {sheet_name}")
+        else:
+            print(f"[디버깅] 일련번호를 찾을 수 없어 원래 시트 이름 사용: {sheet_name}")
         
         # 시트 이름이 30자를 초과하면 자르기 (Excel 시트 이름 제한)
         if len(sheet_name) > 30:
@@ -685,6 +690,7 @@ def main():
     excel_manager = ExcelManager()
     sheet = excel_manager.initialize_excel_output()
     
+    # 첫번째 인터페이스
     # 샘플 데이터로 요약 시트 업데이트
     sample_data = {
         "interface_info": {
@@ -723,7 +729,7 @@ def main():
     }
     excel_manager.update_summary_sheet(sample_data)
     
-    # 샘플 인터페이스 시트 생성
+    # 첫번째 인터페이스 시트 생성
     if_info = {
         'interface_id': 'IF001',
         'interface_name': '테스트 인터페이스',
@@ -773,6 +779,7 @@ def main():
         }
     }
     
+    # 첫번째 인터페이스 시트 생성
     excel_manager.create_interface_sheet(if_info, mq_files, bw_files, queries, comparison_results)
     
     # 두 번째 샘플 인터페이스 데이터 추가
@@ -841,6 +848,7 @@ def main():
     for if_id, seq_num in excel_manager.interface_id_map.items():
         print(f"인터페이스 ID: {if_id}, 일련번호: {seq_num}")
     
+    # 두 번째 인터페이스 시트 생성
     excel_manager.create_interface_sheet(if_info2, mq_files2, bw_files, queries, comparison_results)
     
     # 결과 저장
