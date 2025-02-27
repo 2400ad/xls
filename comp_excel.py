@@ -100,6 +100,11 @@ class ExcelManager:
             self.workbook = openpyxl.Workbook()
         
         self.output_path = ''
+        
+        # 결과 상태에 따른 색상 정의
+        self.match_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")  # 녹색
+        self.mismatch_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")  # 빨간색
+        self.unavailable_fill = PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid")  # 노란색
     
     def initialize_excel_output(self):
         """
@@ -215,26 +220,49 @@ class ExcelManager:
         if isinstance(send_comparison, str):
             # "일치" 또는 "불일치" 문자열 그대로 사용
             cell = sheet.cell(row=row, column=7, value=send_comparison)
+            # 결과에 따른 셀 색상 적용
+            if send_comparison == "일치":
+                cell.fill = self.match_fill
+            elif send_comparison == "불일치":
+                cell.fill = self.mismatch_fill
+            else:
+                cell.fill = self.unavailable_fill
         # QueryDifference 클래스 인스턴스인 경우
         elif hasattr(send_comparison, "is_equal") and not isinstance(send_comparison, dict):
             # QueryDifference 클래스의 __str__ 메서드 사용하여 "일치" 또는 "불일치" 가져오기
-            cell = sheet.cell(row=row, column=7, value=str(send_comparison))
+            result_str = str(send_comparison)
+            cell = sheet.cell(row=row, column=7, value=result_str)
+            # 결과에 따른 셀 색상 적용
+            if result_str == "일치":
+                cell.fill = self.match_fill
+            elif result_str == "불일치":
+                cell.fill = self.mismatch_fill
+            else:
+                cell.fill = self.unavailable_fill
         # 딕셔너리인 경우 확인
         elif isinstance(send_comparison, dict):
             if "is_equal" in send_comparison:
                 is_equal = send_comparison.get("is_equal", False)
-                cell = sheet.cell(row=row, column=7, value="일치" if is_equal else "불일치")
+                result_str = "일치" if is_equal else "불일치"
+                cell = sheet.cell(row=row, column=7, value=result_str)
+                # 결과에 따른 셀 색상 적용
+                cell.fill = self.match_fill if is_equal else self.mismatch_fill
             # 또는 "detail" 필드가 있을 경우
             elif "detail" in send_comparison:
                 detail = send_comparison.get("detail", "")
                 if detail == "일치" or detail == "불일치":
                     cell = sheet.cell(row=row, column=7, value=detail)
+                    # 결과에 따른 셀 색상 적용
+                    cell.fill = self.match_fill if detail == "일치" else self.mismatch_fill
                 else:
                     cell = sheet.cell(row=row, column=7, value="불일치")
+                    cell.fill = self.mismatch_fill
             else:
                 cell = sheet.cell(row=row, column=7, value="비교불가")
+                cell.fill = self.unavailable_fill
         else:
             cell = sheet.cell(row=row, column=7, value="비교불가")
+            cell.fill = self.unavailable_fill
         cell.font = font_normal
         
         # MQ 수신 파일
@@ -254,26 +282,49 @@ class ExcelManager:
         if isinstance(recv_comparison, str):
             # "일치" 또는 "불일치" 문자열 그대로 사용
             cell = sheet.cell(row=row, column=10, value=recv_comparison)
+            # 결과에 따른 셀 색상 적용
+            if recv_comparison == "일치":
+                cell.fill = self.match_fill
+            elif recv_comparison == "불일치":
+                cell.fill = self.mismatch_fill
+            else:
+                cell.fill = self.unavailable_fill
         # QueryDifference 클래스 인스턴스인 경우
         elif hasattr(recv_comparison, "is_equal") and not isinstance(recv_comparison, dict):
             # QueryDifference 클래스의 __str__ 메서드 사용하여 "일치" 또는 "불일치" 가져오기
-            cell = sheet.cell(row=row, column=10, value=str(recv_comparison))
+            result_str = str(recv_comparison)
+            cell = sheet.cell(row=row, column=10, value=result_str)
+            # 결과에 따른 셀 색상 적용
+            if result_str == "일치":
+                cell.fill = self.match_fill
+            elif result_str == "불일치":
+                cell.fill = self.mismatch_fill
+            else:
+                cell.fill = self.unavailable_fill
         # 딕셔너리인 경우 확인
         elif isinstance(recv_comparison, dict):
             if "is_equal" in recv_comparison:
                 is_equal = recv_comparison.get("is_equal", False)
-                cell = sheet.cell(row=row, column=10, value="일치" if is_equal else "불일치")
+                result_str = "일치" if is_equal else "불일치"
+                cell = sheet.cell(row=row, column=10, value=result_str)
+                # 결과에 따른 셀 색상 적용
+                cell.fill = self.match_fill if is_equal else self.mismatch_fill
             # 또는 "detail" 필드가 있을 경우
             elif "detail" in recv_comparison:
                 detail = recv_comparison.get("detail", "")
                 if detail == "일치" or detail == "불일치":
                     cell = sheet.cell(row=row, column=10, value=detail)
+                    # 결과에 따른 셀 색상 적용
+                    cell.fill = self.match_fill if detail == "일치" else self.mismatch_fill
                 else:
                     cell = sheet.cell(row=row, column=10, value="불일치")
+                    cell.fill = self.mismatch_fill
             else:
                 cell = sheet.cell(row=row, column=10, value="비교불가")
+                cell.fill = self.unavailable_fill
         else:
             cell = sheet.cell(row=row, column=10, value="비교불가")
+            cell.fill = self.unavailable_fill
         cell.font = font_normal
 
     def save_excel_output(self, output_path):
@@ -525,15 +576,16 @@ class ExcelManager:
                 is_send_equal = comparison_results['send'].is_equal
                 send_detail = getattr(comparison_results['send'], 'detail', 'N/A')
                 
-        sheet.cell(row=row, column=5, value='일치' if is_send_equal else '불일치')
-        sheet.cell(row=row, column=5).alignment = align_center
+        result_cell = sheet.cell(row=row, column=5, value='일치' if is_send_equal else '불일치')
+        result_cell.alignment = align_center
+        # 결과에 따른 셀 색상 적용
+        if is_send_equal:
+            result_cell.fill = self.match_fill
+        else:
+            result_cell.fill = self.mismatch_fill
+        
         sheet.cell(row=row, column=6, value=send_detail)
         sheet.cell(row=row, column=6).alignment = wrap_text_top
-        
-        if is_send_equal:
-            sheet.cell(row=row, column=5).fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
-        else:
-            sheet.cell(row=row, column=5).fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
         
         # 쿼리 행 높이 설정
         sheet.row_dimensions[row].height = 150
@@ -581,15 +633,16 @@ class ExcelManager:
                 is_recv_equal = comparison_results['recv'].is_equal
                 recv_detail = getattr(comparison_results['recv'], 'detail', 'N/A')
                 
-        sheet.cell(row=row, column=5, value='일치' if is_recv_equal else '불일치')
-        sheet.cell(row=row, column=5).alignment = align_center
+        result_cell = sheet.cell(row=row, column=5, value='일치' if is_recv_equal else '불일치')
+        result_cell.alignment = align_center
+        # 결과에 따른 셀 색상 적용
+        if is_recv_equal:
+            result_cell.fill = self.match_fill
+        else:
+            result_cell.fill = self.mismatch_fill
+        
         sheet.cell(row=row, column=6, value=recv_detail)
         sheet.cell(row=row, column=6).alignment = wrap_text_top
-        
-        if is_recv_equal:
-            sheet.cell(row=row, column=5).fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
-        else:
-            sheet.cell(row=row, column=5).fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
         
         # 쿼리 행 높이 설정
         sheet.row_dimensions[row].height = 150
