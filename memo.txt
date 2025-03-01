@@ -33,3 +33,5 @@ VALUES ('홍길동', 30, 'hong@example.com');
 </xsl:otherwise>
 </xsl:choose>
 </FRUIT1>
+
+
