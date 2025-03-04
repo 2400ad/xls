@@ -1151,11 +1151,16 @@ class BWQueryExtractor:
         result = query
         temp_replacements = {}
         
+        import re
+        
         for i, (param_name, actual_value) in enumerate(mappings.items()):
             # 고유한 임시 패턴 생성 (절대 원본 쿼리에 존재할 수 없는 패턴)
             temp_pattern = f"__TEMP_PLACEHOLDER_{i}__"
-            # 원래 패턴을 임시 패턴으로 변환
-            result = result.replace(f":{param_name}", temp_pattern)
+            
+            # 정규 표현식을 사용하여 정확한 파라미터 이름만 대체
+            # 단어 경계(\b)를 사용하여 정확한 파라미터 이름만 매칭
+            result = re.sub(f":{param_name}\\b", temp_pattern, result)
+            
             # 임시 패턴을 최종 값으로 매핑
             temp_replacements[temp_pattern] = f":{actual_value}"
         
