@@ -397,89 +397,136 @@ def validate_xml_files_in_directory(directory: str, output_file: str = None):
     """
     validator = XMLQueryValidator()
     results = []
+    valid_count = 0
+    invalid_count = 0
+    
+    print("\n" + "="*60)
+    print("XML 쿼리 검증 결과 요약")
+    print("="*60)
+    print(f"{'파일명':<30} {'쿼리유형':<10} {'상태':<8} {'요약'}")
+    print("-"*60)
     
     # 디렉토리 내의 모든 XML 파일 검색
     for root, _, files in os.walk(directory):
         for file in files:
             if file.lower().endswith('.xml'):
                 file_path = os.path.join(root, file)
-                print(f"검증 중: {file_path}")
                 
                 # XML 파일 검증
                 result = validator.validate_xml_file(file_path)
                 result['file_path'] = file_path
                 results.append(result)
                 
-                # 결과 요약 출력
-                print(f"  XML 구조 유효성: {'O' if result['xml_structure'] else 'X'}")
-                print(f"  필드 이름: {result['field_names']}")
-                print(f"  필드 개수: {result['fields_count']}")
-                print(f"  SELECT 쿼리 수: {len(result['select_queries'])}")
-                print(f"  INSERT 쿼리 수: {len(result['insert_queries'])}")
-                print(f"  전체 유효성: {'O' if result['valid'] else 'X'}")
+                # 간략한 요약 정보 추출
+                file_name = os.path.basename(file_path)
                 
-                # 원본 쿼리 출력 (로깅)
-                if result['raw_query']:
-                    print(f"\n  원본 쿼리 (처음 100자):")
-                    print(f"    {result['raw_query'][:100]}...")
+                # 쿼리 유형 결정
+                query_type = "N/A"
+                if result['select_queries']:
+                    query_type = "SELECT"
+                elif result['insert_queries']:
+                    query_type = "INSERT"
                 
-                # 오류가 있는 경우 자세한 정보 출력
-                if not result['valid']:
-                    print("  오류 세부 정보:")
-                    
-                    for i, query_result in enumerate(result['select_queries']):
-                        if not query_result['valid']:
-                            print(f"    SELECT 쿼리 #{i+1}:")
-                            for error in query_result['errors']:
-                                print(f"      - {error}")
-                                
-                    for i, query_result in enumerate(result['insert_queries']):
-                        if not query_result['valid']:
-                            print(f"    INSERT 쿼리 #{i+1}:")
-                            for error in query_result['errors']:
-                                print(f"      - {error}")
+                # 상태 결정
+                status = "정상" if result['valid'] else "비정상"
+                if result['valid']:
+                    valid_count += 1
+                else:
+                    invalid_count += 1
                 
-                print("")
+                # 요약 메시지 생성
+                summary = []
+                if not result['xml_structure']:
+                    summary.append("XML구조오류")
+                elif not result['valid']:
+                    if result['select_queries'] and not result['select_queries'][0]['valid']:
+                        query_result = result['select_queries'][0]
+                        if 'columns_match_xml_fields' in query_result and not query_result['columns_match_xml_fields']:
+                            summary.append("컬럼-필드불일치")
+                        if 'xml_fields_count_valid' in query_result and not query_result['xml_fields_count_valid']:
+                            summary.append("필드수부족")
+                    elif result['insert_queries'] and not result['insert_queries'][0]['valid']:
+                        query_result = result['insert_queries'][0]
+                        if not query_result['columns_values_match']:
+                            summary.append("컬럼-값불일치")
+                        if not query_result['xml_fields_count_valid']:
+                            summary.append("필드수부족")
+                    if not summary:
+                        summary.append("기타오류")
+                else:
+                    summary.append("필드수정상")
+                    if query_type == "SELECT":
+                        summary.append("컬럼-필드일치")
+                    elif query_type == "INSERT":
+                        summary.append("컬럼-값일치")
+                
+                summary_str = ", ".join(summary)
+                
+                # 결과 출력
+                print(f"{file_name:<30} {query_type:<10} {status:<8} {summary_str}")
+    
+    # 전체 요약 출력
+    print("-"*60)
+    print(f"총 파일 수: {len(results)}, 정상: {valid_count}, 비정상: {invalid_count}")
+    print("="*60)
     
     # 결과를 파일로 저장 (선택 사항)
     if output_file:
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write("XML 쿼리 검증 결과\n")
-            f.write("=" * 50 + "\n\n")
+            f.write("=" * 60 + "\n\n")
+            
+            f.write(f"{'파일명':<30} {'쿼리유형':<10} {'상태':<8} {'요약'}\n")
+            f.write("-"*60 + "\n")
             
             for result in results:
-                f.write(f"파일: {result['file_path']}\n")
-                f.write(f"XML 구조 유효성: {'O' if result['xml_structure'] else 'X'}\n")
-                f.write(f"필드 이름: {result['field_names']}\n")
-                f.write(f"필드 개수: {result['fields_count']}\n")
-                f.write(f"SELECT 쿼리 수: {len(result['select_queries'])}\n")
-                f.write(f"INSERT 쿼리 수: {len(result['insert_queries'])}\n")
-                f.write(f"전체 유효성: {'O' if result['valid'] else 'X'}\n")
+                file_name = os.path.basename(result['file_path'])
                 
-                if result['raw_query']:
-                    f.write(f"원본 쿼리:\n{result['raw_query']}\n")
+                # 쿼리 유형 결정
+                query_type = "N/A"
+                if result['select_queries']:
+                    query_type = "SELECT"
+                elif result['insert_queries']:
+                    query_type = "INSERT"
                 
-                if not result['valid']:
-                    f.write("오류 세부 정보:\n")
-                    
-                    for i, query_result in enumerate(result['select_queries']):
-                        if not query_result['valid']:
-                            f.write(f"  SELECT 쿼리 #{i+1}:\n")
-                            f.write(f"  쿼리: {query_result['query']}\n")
-                            for error in query_result['errors']:
-                                f.write(f"    - {error}\n")
-                                
-                    for i, query_result in enumerate(result['insert_queries']):
-                        if not query_result['valid']:
-                            f.write(f"  INSERT 쿼리 #{i+1}:\n")
-                            f.write(f"  쿼리: {query_result['query']}\n")
-                            for error in query_result['errors']:
-                                f.write(f"    - {error}\n")
+                # 상태 결정
+                status = "정상" if result['valid'] else "비정상"
                 
-                f.write("\n" + "-" * 50 + "\n\n")
+                # 요약 메시지 생성
+                summary = []
+                if not result['xml_structure']:
+                    summary.append("XML구조오류")
+                elif not result['valid']:
+                    if result['select_queries'] and not result['select_queries'][0]['valid']:
+                        query_result = result['select_queries'][0]
+                        if 'columns_match_xml_fields' in query_result and not query_result['columns_match_xml_fields']:
+                            summary.append("컬럼-필드불일치")
+                        if 'xml_fields_count_valid' in query_result and not query_result['xml_fields_count_valid']:
+                            summary.append("필드수부족")
+                    elif result['insert_queries'] and not result['insert_queries'][0]['valid']:
+                        query_result = result['insert_queries'][0]
+                        if not query_result['columns_values_match']:
+                            summary.append("컬럼-값불일치")
+                        if not query_result['xml_fields_count_valid']:
+                            summary.append("필드수부족")
+                    if not summary:
+                        summary.append("기타오류")
+                else:
+                    summary.append("필드수정상")
+                    if query_type == "SELECT":
+                        summary.append("컬럼-필드일치")
+                    elif query_type == "INSERT":
+                        summary.append("컬럼-값일치")
+                
+                summary_str = ", ".join(summary)
+                
+                f.write(f"{file_name:<30} {query_type:<10} {status:<8} {summary_str}\n")
+            
+            f.write("-"*60 + "\n")
+            f.write(f"총 파일 수: {len(results)}, 정상: {valid_count}, 비정상: {invalid_count}\n")
             
             print(f"결과가 파일에 저장되었습니다: {output_file}")
-    
+            
     return results
 
 if __name__ == "__main__":
