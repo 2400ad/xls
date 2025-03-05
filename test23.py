@@ -4,6 +4,10 @@ import re
 import xml.etree.ElementTree as ET
 from typing import Dict, List, Tuple, Optional
 
+# Import functionality from existing files
+from comp_q import QueryParser
+from comp_xml import XMLComparator
+
 class XMLQueryValidator:
     """
     XML 파일 내부의 SQL 쿼리를 검증하는 클래스
