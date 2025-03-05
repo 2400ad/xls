@@ -133,7 +133,7 @@ class XMLQueryValidator:
                 # SELECT 쿼리 검증
                 query_result = self.validate_select_query(query, field_names, fields_count)
                 result['select_queries'].append(query_result)
-            elif query.strip().upper().startswith('INSERT'):
+            elif query.strip().upper().startswith('INSERT') or query.strip().upper().startswith('BEGIN'):
                 # INSERT 쿼리 검증
                 query_result = self.validate_insert_query(query, fields_count)
                 result['insert_queries'].append(query_result)
@@ -360,6 +360,9 @@ class XMLQueryValidator:
         # 디버깅: 원본 쿼리 출력
         print(f"DEBUG - 원본 INSERT 쿼리: {query}")
         
+        # 참고: BEGIN 블록 처리는 validate_insert_query에서 이미 수행됨
+        # 이 메서드는 순수하게 컬럼과 값 추출만 담당
+        
         # 컬럼 추출 (INSERT INTO table_name (col1, col2, ...) VALUES ...)
         columns_pattern = r'INSERT\s+INTO\s+\w+\s*\(([^)]+)\)'
         print(f"DEBUG - 컬럼 추출 정규식 패턴: {columns_pattern}")
@@ -447,9 +450,26 @@ class XMLQueryValidator:
         print(f"DEBUG - INSERT 쿼리 검증 - fields_count: {fields_count}")
         
         # 기본 INSERT 쿼리 구조 확인
-        if not query.strip().upper().startswith('INSERT INTO'):
-            result['errors'].append("쿼리가 INSERT INTO로 시작하지 않습니다.")
+        if not (query.strip().upper().startswith('INSERT INTO') or 
+                ('INSERT INTO' in query.strip().upper() and query.strip().upper().startswith('BEGIN'))):
+            result['errors'].append("쿼리에 INSERT INTO가 포함되어 있지 않습니다.")
             return result
+        
+        # 원본 쿼리 저장 (디버깅 목적)
+        original_query = query
+        
+        # BEGIN 블록에서 INSERT 구문 추출
+        if query.strip().upper().startswith('BEGIN'):
+            # BEGIN 블록에서 INSERT 구문 찾기
+            insert_match = re.search(r'INSERT\s+INTO.+?;', query, re.IGNORECASE | re.DOTALL)
+            if insert_match:
+                insert_query = insert_match.group(0)
+                print(f"DEBUG - BEGIN 블록에서 추출한 INSERT 구문: {insert_query}")
+                # 추출한 INSERT 구문으로 쿼리 업데이트
+                query = insert_query
+            else:
+                result['errors'].append("BEGIN 블록 내에서 INSERT INTO 구문을 찾을 수 없습니다.")
+                return result
         
         # 컬럼과 값 추출
         columns, values = self.extract_insert_columns_and_values(query)
