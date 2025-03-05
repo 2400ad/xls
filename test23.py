@@ -557,25 +557,25 @@ class XMLQueryValidator:
             result['errors'].append("INSERT 쿼리에서 VALUES 절을 찾을 수 없습니다.")
             return result
         
+        # 컬럼 수가 2보다 작은지 확인
+        if len(columns) <= 2:
+            result['errors'].append(f"INSERT 쿼리의 컬럼 수({len(columns)})가 2 이하입니다. 3개 이상이어야 합니다.")
+            return result
+        
         result['columns_count'] = len(columns)
         result['values_count'] = len(values)
         
-        # 컬럼과 값 매핑
+        # 컬럼과 값의 매핑 생성
+        columns_values_mapping = {}
         if len(columns) == len(values):
             result['columns_values_match'] = True
-            result['columns_values_mapping'] = dict(zip(columns, values))
-            # 디버깅: 컬럼-값 매핑 딕셔너리 출력
-            print(f"DEBUG - 컬럼-값 매핑 딕셔너리:")
-            for col, val in result['columns_values_mapping'].items():
-                print(f"  {col}: {val}")
+            # 컬럼-값 매핑 생성
+            for i in range(len(columns)):
+                columns_values_mapping[columns[i]] = values[i]
+            result['columns_values_mapping'] = columns_values_mapping
+            print(f"DEBUG - 컬럼-값 매핑: {columns_values_mapping}")
         else:
-            result['errors'].append(
-                f"컬럼 수({len(columns)})와 값 수({len(values)})가 일치하지 않습니다."
-            )
-            # 디버깅: 불일치하는 컬럼과 값 출력
-            print(f"DEBUG - 불일치: 컬럼 수={len(columns)}, 값 수={len(values)}")
-            print(f"DEBUG - 컬럼: {columns}")
-            print(f"DEBUG - 값: {values}")
+            result['errors'].append(f"컬럼 수({len(columns)})와 값 수({len(values)})가 일치하지 않습니다.")
         
         # XML의 <fields> 태그 count 속성 확인
         if fields_count >= 2:
