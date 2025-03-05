@@ -55,6 +55,9 @@ class XMLQueryValidator:
             if fields_tag is not None:
                 # fields의 count 속성 확인
                 fields_count = int(fields_tag.get('count', '0'))
+                # 디버깅: fields 태그의 count 속성 값 확인
+                print(f"DEBUG - fields 태그의 count 속성 값: {fields_count}")
+                print(f"DEBUG - fields 태그의 원본 속성: {fields_tag.attrib}")
                 
                 # 모든 field 태그를 찾아 name 속성 값 추출
                 for field_tag in fields_tag.findall(".//field"):
@@ -352,16 +355,27 @@ class XMLQueryValidator:
         columns = []
         values = []
         
+        # 디버깅: 원본 쿼리 출력
+        print(f"DEBUG - 원본 INSERT 쿼리: {query}")
+        
         # 컬럼 추출 (INSERT INTO table_name (col1, col2, ...) VALUES ...)
         columns_match = re.search(r'INSERT\s+INTO\s+\w+\s*\(([^)]+)\)', query, re.IGNORECASE | re.DOTALL)
         if columns_match:
             columns_str = columns_match.group(1).strip()
             columns = [col.strip().lower() for col in columns_str.split(',')]
+            # 디버깅: 추출된 컬럼 문자열과 분리된 컬럼 목록
+            print(f"DEBUG - 추출된 컬럼 문자열: {columns_str}")
+            print(f"DEBUG - 분리된 컬럼 목록: {columns}")
+        else:
+            # 디버깅: 컬럼 추출 실패
+            print("DEBUG - 컬럼 추출 실패: 정규식 패턴과 일치하지 않음")
         
         # VALUES 절 추출
         values_match = re.search(r'VALUES\s*\(([^)]+)\)', query, re.IGNORECASE | re.DOTALL)
         if values_match:
             values_str = values_match.group(1).strip()
+            # 디버깅: 추출된 값 문자열
+            print(f"DEBUG - 추출된 값 문자열: {values_str}")
             
             # 값 파싱 (문자열 내의 쉼표 처리)
             in_string = False
@@ -410,6 +424,9 @@ class XMLQueryValidator:
             'errors': []
         }
         
+        # 디버깅: fields_count 값 확인
+        print(f"DEBUG - INSERT 쿼리 검증 - fields_count: {fields_count}")
+        
         # 기본 INSERT 쿼리 구조 확인
         if not query.strip().upper().startswith('INSERT INTO'):
             result['errors'].append("쿼리가 INSERT INTO로 시작하지 않습니다.")
@@ -417,6 +434,10 @@ class XMLQueryValidator:
         
         # 컬럼과 값 추출
         columns, values = self.extract_insert_columns_and_values(query)
+        
+        # 디버깅: 추출된 컬럼과 값 확인
+        print(f"DEBUG - 추출된 컬럼: {columns}")
+        print(f"DEBUG - 추출된 값: {values}")
         
         if not columns:
             result['errors'].append("INSERT 쿼리에서 컬럼 리스트를 찾을 수 없습니다.")
@@ -443,6 +464,10 @@ class XMLQueryValidator:
             result['xml_fields_count_valid'] = True
         else:
             result['errors'].append(f"XML의 <fields> 태그 count가 2 미만입니다: {fields_count}")
+        
+        # 디버깅: 검증 결과 확인
+        print(f"DEBUG - columns_values_match: {result['columns_values_match']}")
+        print(f"DEBUG - xml_fields_count_valid: {result['xml_fields_count_valid']}")
         
         # 종합 유효성 판단
         if result['columns_values_match'] and result['xml_fields_count_valid']:
