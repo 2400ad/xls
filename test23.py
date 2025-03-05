@@ -180,11 +180,8 @@ class XMLQueryValidator:
             if char == ',' and in_parentheses == 0:
                 # 컬럼 구분자를 만났고 괄호 내부가 아닌 경우
                 if current_column.strip():
-                    # 앨리어스 제거 (AS 키워드 다음이나 공백 다음의 이름)
-                    column_name = re.sub(r'(?i)\s+AS\s+\w+$|\s+\w+$', '', current_column.strip())
-                    # 테이블 접두사 제거 (schema.table.column 또는 table.column 형식)
-                    column_name = column_name.strip().split('.')[-1].lower()
-                    columns.append(column_name)
+                    # 컬럼 추가
+                    self._process_column(current_column, columns)
                 current_column = ""
             else:
                 if char == '(':
@@ -195,11 +192,53 @@ class XMLQueryValidator:
         
         # 마지막 컬럼 처리
         if current_column.strip():
-            column_name = re.sub(r'(?i)\s+AS\s+\w+$|\s+\w+$', '', current_column.strip())
-            column_name = column_name.strip().split('.')[-1].lower()
-            columns.append(column_name)
+            self._process_column(current_column, columns)
         
         return columns
+    
+    def _process_column(self, column_text: str, columns: List[str]):
+        """
+        컬럼 텍스트를 처리하여 컬럼 목록에 추가합니다.
+        함수 호출이 포함된 경우 함수 내부의 파라미터에서 컬럼 이름을 추출합니다.
+        
+        Args:
+            column_text (str): 처리할 컬럼 텍스트
+            columns (List[str]): 추가할 컬럼 목록
+        """
+        column_text = column_text.strip()
+        
+        # 앨리어스 제거 (AS 키워드 다음이나 공백 다음의 이름)
+        column_name = re.sub(r'(?i)\s+AS\s+\w+$|\s+\w+$', '', column_text)
+        
+        # 함수 호출인 경우 (괄호 있는 경우)
+        if '(' in column_name and ')' in column_name:
+            # 함수명 추출
+            func_match = re.match(r'(\w+)\s*\(', column_name)
+            if func_match:
+                func_name = func_match.group(1).lower()
+                
+                # TO_CHAR 같은 함수인 경우 첫 번째 인자가 컬럼명일 가능성이 높음
+                if func_name in ['to_char', 'to_date', 'nvl', 'decode']:
+                    # 괄호 내부 추출
+                    params_match = re.search(r'\((.*)\)', column_name)
+                    if params_match:
+                        params = params_match.group(1).split(',')
+                        if params:
+                            # 첫 번째 파라미터가 컬럼명일 가능성이 높음
+                            first_param = params[0].strip()
+                            # 파라미터가 문자열이 아닌 경우만 컬럼으로 처리
+                            if not (first_param.startswith("'") and first_param.endswith("'")):
+                                # 테이블 접두사 제거
+                                param_column = first_param.split('.')[-1].lower()
+                                columns.append(param_column)
+                                return
+            
+            # 위 특수 케이스에 해당하지 않으면 함수 전체를 컬럼으로 취급
+            columns.append(column_name.lower())
+        else:
+            # 테이블 접두사 제거 (schema.table.column 또는 table.column 형식)
+            column_name = column_name.split('.')[-1].lower()
+            columns.append(column_name)
     
     def validate_select_query(self, query: str, xml_field_names: List[str]) -> Dict:
         """
