@@ -260,12 +260,26 @@ class XMLQueryValidator:
         # XML 필드 이름과 쿼리 컬럼 비교
         if extracted_columns and xml_field_names:
             # 모든 컬럼 이름이 XML 필드에 있는지 확인
-            missing_columns = [col for col in extracted_columns if col.lower() not in [f.lower() for f in xml_field_names]]
+            missing_fields = []
+            for field in xml_field_names:
+                field_found = False
+                for col in extracted_columns:
+                    # 정확히 일치하는 경우
+                    if col.lower() == field.lower():
+                        field_found = True
+                        break
+                    # 컬럼 문자열 내에 필드 이름이 포함되어 있는 경우 (TO_CHAR 등의 함수 처리)
+                    elif field.lower() in col.lower():
+                        field_found = True
+                        break
+                
+                if not field_found:
+                    missing_fields.append(field)
             
-            if not missing_columns:
+            if not missing_fields:
                 result['columns_match_xml_fields'] = True
             else:
-                result['errors'].append(f"쿼리 컬럼과 XML 필드 이름이 일치하지 않습니다. 누락된 컬럼: {missing_columns}")
+                result['errors'].append(f"쿼리에서 XML 필드와 일치하지 않는 컬럼이 있습니다: {', '.join(missing_fields)}")
         elif not xml_field_names:
             result['errors'].append("XML에 <fields> 태그가 없거나 <field> 태그의 name 속성이 없습니다.")
         
