@@ -6,7 +6,6 @@ from typing import Dict, List, Tuple, Optional
 
 # Import functionality from existing files
 from comp_q import QueryParser
-from comp_xml import XMLComparator
 
 class XMLQueryValidator:
     """
@@ -16,6 +15,54 @@ class XMLQueryValidator:
     def __init__(self):
         """초기화 메서드"""
         self.query_parser = QueryParser()  # 기존 QueryParser 활용
+    
+    def extract_from_xml(self, xml_path: str) -> Tuple[str, str]:
+        """
+        XML 파일에서 쿼리와 XML 내용을 추출합니다.
+        이 함수는 comp_xml.py의 동일한 함수를 기반으로 합니다.
+        
+        Args:
+            xml_path (str): XML 파일 경로
+            
+        Returns:
+            Tuple[str, str]: (쿼리, XML 내용)
+        """
+        try:
+            # XML 파일이 제대로 로드되었는지 확인
+            if not os.path.exists(xml_path):
+                print(f"Warning: XML file not found: {xml_path}")
+                return None, None
+                
+            tree = ET.parse(xml_path)
+            root = tree.getroot()
+            
+            # XML 내용이 유효한지 확인
+            if root is None:
+                print(f"Warning: Invalid XML content in file: {xml_path}")
+                return None, None
+            
+            # SQL 노드 찾기
+            sql_node = root.find(".//SQL")
+            if sql_node is None or not sql_node.text:
+                print(f"Warning: No SQL content found in file: {xml_path}")
+                return None, None
+                
+            query = sql_node.text.strip()
+            xml_content = ET.tostring(root, encoding='unicode')
+            
+            # 추출된 쿼리가 유효한지 확인
+            if not query:
+                print(f"Warning: Empty SQL query in file: {xml_path}")
+                return None, None
+                
+            return query, xml_content
+            
+        except ET.ParseError as e:
+            print(f"Error parsing XML file {xml_path}: {e}")
+            return None, None
+        except Exception as e:
+            print(f"Unexpected error processing file {xml_path}: {e}")
+            return None, None
     
     def validate_xml_file(self, xml_path: str) -> Dict[str, List[Dict]]:
         """
@@ -55,7 +102,9 @@ class XMLQueryValidator:
             'xml_structure': False,
             'select_queries': [],
             'insert_queries': [],
-            'errors': []
+            'errors': [],
+            'xml_content': None,
+            'raw_query': None
         }
         
         try:
@@ -64,28 +113,33 @@ class XMLQueryValidator:
                 result['errors'] = [f"XML 파일을 찾을 수 없습니다: {xml_path}"]
                 return result
                 
-            # XML 파일이 유효한지 확인
-            try:
-                tree = ET.parse(xml_path)
-                root = tree.getroot()
-                result['xml_structure'] = True
-            except ET.ParseError as e:
-                result['errors'] = [f"XML 파싱 오류: {str(e)}"]
+            # comp_xml.py의 extract_from_xml 함수 사용하여 쿼리 및 XML 내용 추출
+            query, xml_content = self.extract_from_xml(xml_path)
+            
+            if not query or not xml_content:
+                result['errors'].append(f"XML 파일에서 쿼리를 추출할 수 없습니다: {xml_path}")
                 return result
                 
-            # XML에서 쿼리 추출
-            select_queries, insert_queries = self.query_parser.parse_xml_file(xml_path)
+            # 추출된 원본 쿼리와 XML 저장 (로깅 목적)
+            result['raw_query'] = query
+            result['xml_content'] = xml_content
+            result['xml_structure'] = True
             
-            # SELECT 쿼리 검증
-            for query in select_queries:
+            print(f"\n추출된 원본 쿼리:\n{query}\n")
+            
+            # XML에서 쿼리 유형 판별 (SELECT 또는 INSERT)
+            if query.strip().upper().startswith('SELECT'):
+                # SELECT 쿼리 검증
                 query_result = self.validate_select_query(query)
                 result['select_queries'].append(query_result)
-                
-            # INSERT 쿼리 검증  
-            for query in insert_queries:
+            elif query.strip().upper().startswith('INSERT'):
+                # INSERT 쿼리 검증
                 query_result = self.validate_insert_query(query)
                 result['insert_queries'].append(query_result)
-                
+            else:
+                # 다른 유형의 쿼리는 현재 지원하지 않음
+                result['errors'].append(f"지원되지 않는 쿼리 유형: {query[:30]}...")
+            
             # 전체 결과에 대한 유효성 결정
             if all(q['valid'] for q in result['select_queries'] + result['insert_queries']):
                 result['valid'] = True
@@ -250,6 +304,11 @@ def validate_xml_files_in_directory(directory: str, output_file: str = None):
                 print(f"  INSERT 쿼리 수: {len(result['insert_queries'])}")
                 print(f"  전체 유효성: {'O' if result['valid'] else 'X'}")
                 
+                # 원본 쿼리 출력 (로깅)
+                if result['raw_query']:
+                    print(f"\n  원본 쿼리 (처음 100자):")
+                    print(f"    {result['raw_query'][:100]}...")
+                
                 # 오류가 있는 경우 자세한 정보 출력
                 if not result['valid']:
                     print("  오류 세부 정보:")
@@ -280,6 +339,9 @@ def validate_xml_files_in_directory(directory: str, output_file: str = None):
                 f.write(f"SELECT 쿼리 수: {len(result['select_queries'])}\n")
                 f.write(f"INSERT 쿼리 수: {len(result['insert_queries'])}\n")
                 f.write(f"전체 유효성: {'O' if result['valid'] else 'X'}\n")
+                
+                if result['raw_query']:
+                    f.write(f"원본 쿼리:\n{result['raw_query']}\n")
                 
                 if not result['valid']:
                     f.write("오류 세부 정보:\n")
@@ -324,6 +386,10 @@ if __name__ == "__main__":
             print(f"SELECT 쿼리 수: {len(result['select_queries'])}")
             print(f"INSERT 쿼리 수: {len(result['insert_queries'])}")
             print(f"전체 유효성: {'O' if result['valid'] else 'X'}")
+            
+            if result['raw_query']:
+                print(f"\n원본 쿼리:")
+                print(result['raw_query'])
             
             if not result['valid']:
                 print("\n오류 세부 정보:")
