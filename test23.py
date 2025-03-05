@@ -334,7 +334,7 @@ class XMLQueryValidator:
         # 종합 유효성 판단
         if (result['has_columns'] and result['has_table'] and 
             ((result['columns_match_xml_fields'] or not xml_field_names) and 
-             (result['xml_fields_count_valid'] or fields_count == 0))):
+             result['xml_fields_count_valid'])):
             result['valid'] = True
             
         return result
