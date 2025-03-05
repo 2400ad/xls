@@ -159,7 +159,8 @@ class XMLQueryValidator:
             List[str]: 추출된 컬럼 이름 목록
         """
         # SELECT와 FROM 사이의 컬럼 부분 추출
-        match = re.match(r'SELECT\s+(.+?)\s+FROM', query, re.IGNORECASE | re.DOTALL)
+        # \b를 사용하여 단어 경계에서만 FROM 키워드 매칭
+        match = re.match(r'SELECT\s+(.+?)\s+\bFROM\b', query, re.IGNORECASE | re.DOTALL)
         if not match:
             return []
         
@@ -267,7 +268,7 @@ class XMLQueryValidator:
             return result
             
         # SELECT 절과 FROM 절 추출
-        select_from_match = re.match(r'SELECT\s+(.+?)\s+FROM\s+(.+?)(?:\s+WHERE|\s*$)', 
+        select_from_match = re.match(r'SELECT\s+(.+?)\s+\bFROM\b\s+(.+?)(?:\s+\bWHERE\b|\s*$)', 
                                     query, 
                                     re.IGNORECASE | re.DOTALL)
                                     
