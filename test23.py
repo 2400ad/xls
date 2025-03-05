@@ -324,7 +324,9 @@ class XMLQueryValidator:
             if not missing_fields:
                 result['columns_match_xml_fields'] = True
             else:
-                result['errors'].append(f"쿼리에서 XML 필드와 일치하지 않는 컬럼이 있습니다: {', '.join(missing_fields)}")
+                result['errors'].append(
+                    f"쿼리에서 XML 필드와 일치하지 않는 컬럼이 있습니다: {', '.join(missing_fields)}"
+                )
         elif not xml_field_names:
             result['errors'].append("XML에 <fields> 태그가 없거나 <field> 태그의 name 속성이 없습니다.")
         
@@ -359,7 +361,9 @@ class XMLQueryValidator:
         print(f"DEBUG - 원본 INSERT 쿼리: {query}")
         
         # 컬럼 추출 (INSERT INTO table_name (col1, col2, ...) VALUES ...)
-        columns_match = re.search(r'INSERT\s+INTO\s+\w+\s*\(([^)]+)\)', query, re.IGNORECASE | re.DOTALL)
+        columns_pattern = r'INSERT\s+INTO\s+\w+\s*\(([^)]+)\)'
+        print(f"DEBUG - 컬럼 추출 정규식 패턴: {columns_pattern}")
+        columns_match = re.search(columns_pattern, query, re.IGNORECASE | re.DOTALL)
         if columns_match:
             columns_str = columns_match.group(1).strip()
             columns = [col.strip().lower() for col in columns_str.split(',')]
@@ -371,7 +375,9 @@ class XMLQueryValidator:
             print("DEBUG - 컬럼 추출 실패: 정규식 패턴과 일치하지 않음")
         
         # VALUES 절 추출
-        values_match = re.search(r'VALUES\s*\(([^)]+)\)', query, re.IGNORECASE | re.DOTALL)
+        values_pattern = r'VALUES\s*\(([^)]+)\)'
+        print(f"DEBUG - VALUES 추출 정규식 패턴: {values_pattern}")
+        values_match = re.search(values_pattern, query, re.IGNORECASE | re.DOTALL)
         if values_match:
             values_str = values_match.group(1).strip()
             # 디버깅: 추출된 값 문자열
@@ -382,6 +388,9 @@ class XMLQueryValidator:
             string_delimiter = None
             current_value = ""
             
+            # 디버깅: 값 파싱 과정 출력
+            print(f"DEBUG - VALUES 파싱 시작:")
+            
             for char in values_str:
                 if char in ("'", '"') and (not in_string or char == string_delimiter):
                     if in_string:
@@ -391,6 +400,8 @@ class XMLQueryValidator:
                         string_delimiter = char
                     current_value += char
                 elif char == ',' and not in_string:
+                    # 디버깅: 파싱된 값 출력
+                    print(f"DEBUG - 파싱된 값: {current_value.strip()}")
                     values.append(current_value.strip())
                     current_value = ""
                 else:
@@ -398,7 +409,15 @@ class XMLQueryValidator:
             
             # 마지막 값 추가
             if current_value.strip():
+                # 디버깅: 마지막 파싱된 값 출력
+                print(f"DEBUG - 마지막 파싱된 값: {current_value.strip()}")
                 values.append(current_value.strip())
+            
+            # 디버깅: 최종 파싱된 값 목록 출력
+            print(f"DEBUG - 최종 파싱된 값 목록: {values}")
+        else:
+            # 디버깅: VALUES 절 추출 실패
+            print("DEBUG - VALUES 절 추출 실패: 정규식 패턴과 일치하지 않음")
         
         return columns, values
         
@@ -454,10 +473,18 @@ class XMLQueryValidator:
         if len(columns) == len(values):
             result['columns_values_match'] = True
             result['columns_values_mapping'] = dict(zip(columns, values))
+            # 디버깅: 컬럼-값 매핑 딕셔너리 출력
+            print(f"DEBUG - 컬럼-값 매핑 딕셔너리:")
+            for col, val in result['columns_values_mapping'].items():
+                print(f"  {col}: {val}")
         else:
             result['errors'].append(
                 f"컬럼 수({len(columns)})와 값 수({len(values)})가 일치하지 않습니다."
             )
+            # 디버깅: 불일치하는 컬럼과 값 출력
+            print(f"DEBUG - 불일치: 컬럼 수={len(columns)}, 값 수={len(values)}")
+            print(f"DEBUG - 컬럼: {columns}")
+            print(f"DEBUG - 값: {values}")
         
         # XML의 <fields> 태그 count 속성 확인
         if fields_count >= 2:
