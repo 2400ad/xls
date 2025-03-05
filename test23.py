@@ -364,6 +364,7 @@ class XMLQueryValidator:
         # 이 메서드는 순수하게 컬럼과 값 추출만 담당
         
         # 컬럼 추출 (INSERT INTO table_name (col1, col2, ...) VALUES ...)
+        # 수정된 정규식 패턴: 세미콜론(;)이 포함된 경우도 처리
         columns_pattern = r'INSERT\s+INTO\s+\w+\s*\(([^)]+)\)'
         print(f"DEBUG - 컬럼 추출 정규식 패턴: {columns_pattern}")
         columns_match = re.search(columns_pattern, query, re.IGNORECASE | re.DOTALL)
@@ -376,9 +377,19 @@ class XMLQueryValidator:
         else:
             # 디버깅: 컬럼 추출 실패
             print("DEBUG - 컬럼 추출 실패: 정규식 패턴과 일치하지 않음")
+            print(f"DEBUG - 쿼리 확인: {query}")
+            # 다른 패턴 시도
+            alt_columns_pattern = r'INSERT\s+INTO\s+\w+\s*\(([^)]+)\)'
+            print(f"DEBUG - 대체 컬럼 추출 정규식 패턴: {alt_columns_pattern}")
+            alt_columns_match = re.search(alt_columns_pattern, query, re.IGNORECASE | re.DOTALL)
+            if alt_columns_match:
+                columns_str = alt_columns_match.group(1).strip()
+                columns = [col.strip().lower() for col in columns_str.split(',')]
+                print(f"DEBUG - 대체 패턴으로 추출된 컬럼 문자열: {columns_str}")
+                print(f"DEBUG - 대체 패턴으로 분리된 컬럼 목록: {columns}")
         
         # VALUES 절 추출
-        values_pattern = r'VALUES\s*\(([^)]+)\)'
+        values_pattern = r'VALUES\s*\(([^;]+)\)'
         print(f"DEBUG - VALUES 추출 정규식 패턴: {values_pattern}")
         values_match = re.search(values_pattern, query, re.IGNORECASE | re.DOTALL)
         if values_match:
@@ -390,11 +401,13 @@ class XMLQueryValidator:
             in_string = False
             string_delimiter = None
             current_value = ""
+            paren_count = 0  # 괄호 카운트 추가
             
             # 디버깅: 값 파싱 과정 출력
             print(f"DEBUG - VALUES 파싱 시작:")
             
             for char in values_str:
+                # 문자열 구분자 처리
                 if char in ("'", '"') and (not in_string or char == string_delimiter):
                     if in_string:
                         in_string = False
@@ -402,7 +415,15 @@ class XMLQueryValidator:
                         in_string = True
                         string_delimiter = char
                     current_value += char
-                elif char == ',' and not in_string:
+                # 괄호 카운트 처리
+                elif char == '(':
+                    paren_count += 1
+                    current_value += char
+                elif char == ')':
+                    paren_count -= 1
+                    current_value += char
+                # 쉼표 처리 - 문자열 내부 또는 괄호 내부의 쉼표는 무시
+                elif char == ',' and not in_string and paren_count == 0:
                     # 디버깅: 파싱된 값 출력
                     print(f"DEBUG - 파싱된 값: {current_value.strip()}")
                     values.append(current_value.strip())
@@ -421,6 +442,53 @@ class XMLQueryValidator:
         else:
             # 디버깅: VALUES 절 추출 실패
             print("DEBUG - VALUES 절 추출 실패: 정규식 패턴과 일치하지 않음")
+            print(f"DEBUG - 쿼리 확인: {query}")
+            # 다른 패턴 시도
+            alt_values_pattern = r'VALUES\s*\((.+?)\)'
+            print(f"DEBUG - 대체 VALUES 추출 정규식 패턴: {alt_values_pattern}")
+            alt_values_match = re.search(alt_values_pattern, query, re.IGNORECASE | re.DOTALL)
+            if alt_values_match:
+                values_str = alt_values_match.group(1).strip()
+                print(f"DEBUG - 대체 패턴으로 추출된 값 문자열: {values_str}")
+                
+                # 값 파싱 (문자열 내의 쉼표 처리) - 위와 동일한 로직
+                in_string = False
+                string_delimiter = None
+                current_value = ""
+                paren_count = 0  # 괄호 카운트
+                
+                print(f"DEBUG - 대체 패턴으로 VALUES 파싱 시작:")
+                
+                for char in values_str:
+                    # 문자열 구분자 처리
+                    if char in ("'", '"') and (not in_string or char == string_delimiter):
+                        if in_string:
+                            in_string = False
+                        else:
+                            in_string = True
+                            string_delimiter = char
+                        current_value += char
+                    # 괄호 카운트 처리
+                    elif char == '(':
+                        paren_count += 1
+                        current_value += char
+                    elif char == ')':
+                        paren_count -= 1
+                        current_value += char
+                    # 쉼표 처리 - 문자열 내부 또는 괄호 내부의 쉼표는 무시
+                    elif char == ',' and not in_string and paren_count == 0:
+                        print(f"DEBUG - 대체 패턴으로 파싱된 값: {current_value.strip()}")
+                        values.append(current_value.strip())
+                        current_value = ""
+                    else:
+                        current_value += char
+                
+                # 마지막 값 추가
+                if current_value.strip():
+                    print(f"DEBUG - 대체 패턴으로 마지막 파싱된 값: {current_value.strip()}")
+                    values.append(current_value.strip())
+                
+                print(f"DEBUG - 대체 패턴으로 최종 파싱된 값 목록: {values}")
         
         return columns, values
         
@@ -460,16 +528,28 @@ class XMLQueryValidator:
         
         # BEGIN 블록에서 INSERT 구문 추출
         if query.strip().upper().startswith('BEGIN'):
-            # BEGIN 블록에서 INSERT 구문 찾기
-            insert_match = re.search(r'INSERT\s+INTO.+?;', query, re.IGNORECASE | re.DOTALL)
+            # BEGIN 블록에서 INSERT 구문 찾기 - 세미콜론까지 포함하도록 수정
+            insert_pattern = r'INSERT\s+INTO.+?;'
+            print(f"DEBUG - BEGIN 블록에서 INSERT 구문 추출 정규식 패턴: {insert_pattern}")
+            insert_match = re.search(insert_pattern, query, re.IGNORECASE | re.DOTALL)
             if insert_match:
                 insert_query = insert_match.group(0)
                 print(f"DEBUG - BEGIN 블록에서 추출한 INSERT 구문: {insert_query}")
                 # 추출한 INSERT 구문으로 쿼리 업데이트
                 query = insert_query
             else:
-                result['errors'].append("BEGIN 블록 내에서 INSERT INTO 구문을 찾을 수 없습니다.")
-                return result
+                # 다른 패턴 시도
+                alt_insert_pattern = r'INSERT\s+INTO.+VALUES\s*\(.+?\)'
+                print(f"DEBUG - 대체 INSERT 구문 추출 정규식 패턴: {alt_insert_pattern}")
+                alt_insert_match = re.search(alt_insert_pattern, query, re.IGNORECASE | re.DOTALL)
+                if alt_insert_match:
+                    insert_query = alt_insert_match.group(0)
+                    print(f"DEBUG - 대체 패턴으로 추출한 INSERT 구문: {insert_query}")
+                    # 추출한 INSERT 구문으로 쿼리 업데이트
+                    query = insert_query
+                else:
+                    result['errors'].append("BEGIN 블록 내에서 INSERT INTO 구문을 찾을 수 없습니다.")
+                    return result
         
         # 컬럼과 값 추출
         columns, values = self.extract_insert_columns_and_values(query)
