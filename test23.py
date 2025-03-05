@@ -128,7 +128,7 @@ class XMLQueryValidator:
             # XML에서 쿼리 유형 판별 (SELECT 또는 INSERT)
             if query.strip().upper().startswith('SELECT'):
                 # SELECT 쿼리 검증
-                query_result = self.validate_select_query(query, field_names)
+                query_result = self.validate_select_query(query, field_names, fields_count)
                 result['select_queries'].append(query_result)
             elif query.strip().upper().startswith('INSERT'):
                 # INSERT 쿼리 검증
@@ -241,13 +241,14 @@ class XMLQueryValidator:
             column_name = column_name.split('.')[-1].lower()
             columns.append(column_name)
     
-    def validate_select_query(self, query: str, xml_field_names: List[str]) -> Dict:
+    def validate_select_query(self, query: str, xml_field_names: List[str], fields_count: int = 0) -> Dict:
         """
         SELECT 쿼리의 유효성을 검사합니다.
         
         Args:
             query (str): 검사할 SELECT 쿼리
             xml_field_names (List[str]): XML에서 추출한 필드 이름 목록
+            fields_count (int): XML의 <fields> 태그의 count 속성 값
             
         Returns:
             Dict: 검증 결과
@@ -258,6 +259,7 @@ class XMLQueryValidator:
             'has_columns': False,
             'has_table': False,
             'columns_match_xml_fields': False,
+            'xml_fields_count_valid': False,
             'extracted_columns': [],
             'errors': []
         }
@@ -323,9 +325,16 @@ class XMLQueryValidator:
         elif not xml_field_names:
             result['errors'].append("XML에 <fields> 태그가 없거나 <field> 태그의 name 속성이 없습니다.")
         
+        # XML의 <fields> 태그 count 속성 확인
+        if fields_count >= 2:
+            result['xml_fields_count_valid'] = True
+        else:
+            result['errors'].append(f"XML의 <fields> 태그 count가 2 미만입니다: {fields_count}")
+        
         # 종합 유효성 판단
         if (result['has_columns'] and result['has_table'] and 
-            (result['columns_match_xml_fields'] or not xml_field_names)):
+            ((result['columns_match_xml_fields'] or not xml_field_names) and 
+             (result['xml_fields_count_valid'] or fields_count == 0))):
             result['valid'] = True
             
         return result
@@ -617,6 +626,14 @@ if __name__ == "__main__":
                     if not query_result['valid']:
                         print(f"\nSELECT 쿼리 #{i+1}:")
                         print(f"쿼리: {query_result['query']}")
+                        if not query_result['has_columns']:
+                            print(f"  - 컬럼 지정 오류: 쿼리에 컬럼이 지정되지 않음")
+                        if not query_result['has_table']:
+                            print(f"  - 테이블 지정 오류: 쿼리에 테이블명이 지정되지 않음")
+                        if not query_result['columns_match_xml_fields'] and result['field_names']:
+                            print(f"  - 컬럼-필드 불일치: 쿼리 컬럼이 XML 필드와 일치하지 않음")
+                        if 'xml_fields_count_valid' in query_result and not query_result['xml_fields_count_valid']:
+                            print(f"  - 필드 개수 오류: XML의 fields count가 2 미만")
                         for error in query_result['errors']:
                             print(f"  - {error}")
                             
