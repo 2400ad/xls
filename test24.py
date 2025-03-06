@@ -149,12 +149,19 @@ class InterfaceXMLToExcel:
         """
         Excel 파일에서 인터페이스 정보를 읽고, XML 파일에서 쿼리를 추출하여 매핑 후 출력 Excel 파일에 작성합니다.
         """
-        # 헤더 행 복사
+        # 헤더 행 복사 및 스타일 적용
         for col in range(1, self.input_worksheet.max_column + 1):
             self.output_worksheet.cell(row=1, column=col).value = self.input_worksheet.cell(row=1, column=col).value
+            self.output_worksheet.cell(row=1, column=col).font = self.normal_font
+            
             self.output_worksheet.cell(row=2, column=col).value = self.input_worksheet.cell(row=2, column=col).value
+            self.output_worksheet.cell(row=2, column=col).font = self.normal_font
+            
             self.output_worksheet.cell(row=3, column=col).value = self.input_worksheet.cell(row=3, column=col).value
+            self.output_worksheet.cell(row=3, column=col).font = self.normal_font
+            
             self.output_worksheet.cell(row=4, column=col).value = self.input_worksheet.cell(row=4, column=col).value
+            self.output_worksheet.cell(row=4, column=col).font = self.normal_font
         
         # 인터페이스 블록 처리
         current_col = 2  # B열부터 시작
@@ -173,13 +180,22 @@ class InterfaceXMLToExcel:
                 
                 print(f"\n처리 중인 인터페이스: {interface_name} (ID: {interface_id})")
                 
-                # 인터페이스 기본 정보 복사
+                # 인터페이스 기본 정보 복사 및 스타일 적용
                 self.output_worksheet.cell(row=1, column=current_col).value = interface_name
+                self.output_worksheet.cell(row=1, column=current_col).font = self.normal_font
+                
                 self.output_worksheet.cell(row=2, column=current_col).value = interface_id
+                self.output_worksheet.cell(row=2, column=current_col).font = self.normal_font
+                
                 self.output_worksheet.cell(row=3, column=current_col).value = self.input_worksheet.cell(row=3, column=current_col).value
+                self.output_worksheet.cell(row=3, column=current_col).font = self.normal_font
                 self.output_worksheet.cell(row=3, column=current_col + 1).value = self.input_worksheet.cell(row=3, column=current_col + 1).value
+                self.output_worksheet.cell(row=3, column=current_col + 1).font = self.normal_font
+                
                 self.output_worksheet.cell(row=4, column=current_col).value = self.input_worksheet.cell(row=4, column=current_col).value
+                self.output_worksheet.cell(row=4, column=current_col).font = self.normal_font
                 self.output_worksheet.cell(row=4, column=current_col + 1).value = self.input_worksheet.cell(row=4, column=current_col + 1).value
+                self.output_worksheet.cell(row=4, column=current_col + 1).font = self.normal_font
                 
                 # 수신 XML 파일 찾기
                 rcv_file_path = self.find_rcv_file(interface_id)
@@ -209,9 +225,10 @@ class InterfaceXMLToExcel:
                 # 매핑 정보를 Excel에 작성
                 row = 5  # 5행부터 컬럼 매핑 시작
                 for column, value in filtered_mapping.items():
-                    # 송신 컬럼은 비워두고 수신 컬럼만 작성
-                    self.output_worksheet.cell(row=row, column=current_col).value = ""  # 송신 컬럼은 비워둠
-                    self.output_worksheet.cell(row=row, column=current_col + 1).value = column  # 수신 컬럼
+                    # 수신 컬럼을 첫 번째 열(B열)에 배치
+                    self.output_worksheet.cell(row=row, column=current_col).value = column  # 수신 컬럼을 첫 번째 열에 배치
+                    # 폰트 크기 설정
+                    self.output_worksheet.cell(row=row, column=current_col).font = self.normal_font
                     row += 1
                 
                 print(f"인터페이스 {interface_name} (ID: {interface_id}) 처리 완료")
