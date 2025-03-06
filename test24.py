@@ -254,9 +254,9 @@ def main():
         current_dir = os.path.dirname(os.path.abspath(__file__))
         
         # 기본 경로 설정 (실제 환경에 맞게 수정 필요)
-        excel_path = os.path.join(current_dir, 'interface.xlsx')  # 인터페이스 정보 파일
-        xml_dir = os.path.join(current_dir, 'xml')  # XML 파일 디렉토리
-        output_path = os.path.join(current_dir, 'test24.xlsx')  # 출력 파일
+        excel_path = os.path.join(current_dir, 'C:\\work\\LT\\input_W7.xlsx')  # 인터페이스 정보 파일
+        xml_dir = os.path.join(current_dir, 'C:\\work\\LT\\W7xml')  # XML 파일 디렉토리
+        output_path = os.path.join(current_dir, 'C:\\work\\LT\\test24.xlsx')  # 출력 파일
         
         # 명령행 인수가 있으면 덮어쓰기
         if len(sys.argv) > 1:
