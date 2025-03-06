@@ -227,8 +227,12 @@ class InterfaceXMLToExcel:
                 for column, value in filtered_mapping.items():
                     # 수신 컬럼을 첫 번째 열(B열)에 배치
                     self.output_worksheet.cell(row=row, column=current_col).value = column  # 수신 컬럼을 첫 번째 열에 배치
-                    # 폰트 크기 설정
                     self.output_worksheet.cell(row=row, column=current_col).font = self.normal_font
+                    
+                    # VALUES 항목을 오른쪽 열(C열)에 배치
+                    self.output_worksheet.cell(row=row, column=current_col + 1).value = value  # VALUES 항목
+                    self.output_worksheet.cell(row=row, column=current_col + 1).font = self.normal_font
+                    
                     row += 1
                 
                 print(f"인터페이스 {interface_name} (ID: {interface_id}) 처리 완료")
