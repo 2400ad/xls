@@ -122,6 +122,33 @@ class InterfaceXMLToExcel:
             print(f"Unexpected error processing file {xml_path}: {e}")
             return None
     
+    def clean_value(self, value: str) -> str:
+        """
+        VALUES 항목에서 콜론(:)을 제거하고 TO_DATE 함수 내의 실제 값만 추출합니다.
+        
+        Args:
+            value (str): 원본 값
+            
+        Returns:
+            str: 정제된 값
+        """
+        if not value:
+            return ""
+        
+        # 콜론(:) 제거
+        cleaned_value = value.replace(':', '')
+        
+        # TO_DATE 함수 처리
+        to_date_pattern = r'TO_DATE\(\s*:?([A-Za-z0-9_]+)\s*,\s*[\'"](.*?)[\'"](\s*\))'
+        to_date_match = re.search(to_date_pattern, value, re.IGNORECASE)
+        
+        if to_date_match:
+            # TO_DATE 함수에서 첫 번째 인자(실제 값)만 추출
+            param_name = to_date_match.group(1)
+            return param_name
+        
+        return cleaned_value
+    
     def get_column_value_mapping(self, query: str) -> Dict[str, str]:
         """
         INSERT 쿼리에서 컬럼과 VALUES를 매핑합니다.
@@ -143,7 +170,13 @@ class InterfaceXMLToExcel:
             
         # 테이블 이름과 컬럼-값 매핑 추출
         table_name, columns = insert_parts
-        return columns
+        
+        # 값 정제 처리
+        cleaned_columns = {}
+        for col, val in columns.items():
+            cleaned_columns[col] = self.clean_value(val)
+            
+        return cleaned_columns
     
     def process_interfaces(self):
         """
@@ -229,8 +262,8 @@ class InterfaceXMLToExcel:
                     self.output_worksheet.cell(row=row, column=current_col).value = column  # 수신 컬럼을 첫 번째 열에 배치
                     self.output_worksheet.cell(row=row, column=current_col).font = self.normal_font
                     
-                    # VALUES 항목을 오른쪽 열(C열)에 배치
-                    self.output_worksheet.cell(row=row, column=current_col + 1).value = value  # VALUES 항목
+                    # VALUES 항목을 오른쪽 열(C열)에 배치 - 이미 정제된 값 사용
+                    self.output_worksheet.cell(row=row, column=current_col + 1).value = value  # VALUES 항목 (콜론 제거와 TO_DATE 함수 처리가 적용됨)
                     self.output_worksheet.cell(row=row, column=current_col + 1).font = self.normal_font
                     
                     row += 1
