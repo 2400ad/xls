@@ -61,28 +61,157 @@ def read_interface_block(ws, start_col):
     
     return interface_info
 
+def read_all_interfaces(xlsx_path):
+    """엑셀 파일에서 모든 인터페이스 정보를 읽어 딕셔너리로 반환합니다."""
+    try:
+        wb = openpyxl.load_workbook(xlsx_path)
+        ws = wb.active
+        
+        interfaces = {}
+        current_col = 2  # B열부터 시작
+        
+        while current_col <= ws.max_column:
+            interface_info = read_interface_block(ws, current_col)
+            if not interface_info:
+                break
+                
+            # 인터페이스 ID를 키로 사용하여 저장
+            interface_id = interface_info['interface_id'].strip()
+            if interface_id:
+                # 송신 컬럼과 수신 컬럼의 매핑 딕셔너리 생성
+                send_recv_mapping = {}
+                for i in range(len(interface_info['send']['columns'])):
+                    send_col = interface_info['send']['columns'][i].strip() if interface_info['send']['columns'][i] else ''
+                    recv_col = interface_info['recv']['columns'][i].strip() if interface_info['recv']['columns'][i] else ''
+                    if send_col:  # 송신 컬럼이 있는 경우만 매핑
+                        send_recv_mapping[send_col] = recv_col
+                
+                interfaces[interface_id] = {
+                    'interface_name': interface_info['interface_name'],
+                    'send_owner': interface_info['send']['owner'],
+                    'send_table': interface_info['send']['table_name'],
+                    'recv_owner': interface_info['recv']['owner'],
+                    'recv_table': interface_info['recv']['table_name'],
+                    'send_recv_mapping': send_recv_mapping
+                }
+            
+            current_col += 3  # 다음 인터페이스로 이동
+        
+        wb.close()
+        return interfaces
+        
+    except Exception as e:
+        print(f'엑셀 파일 읽기 중 오류 발생: {str(e)}')
+        return {}
+
+def compare_interfaces(file1_interfaces, file2_interfaces):
+    """두 엑셀 파일에서 읽은 인터페이스 정보를 비교합니다."""
+    # 공통 인터페이스 ID 찾기
+    common_interface_ids = set(file1_interfaces.keys()) & set(file2_interfaces.keys())
+    
+    # 파일1에만 있는 인터페이스 ID
+    only_in_file1 = set(file1_interfaces.keys()) - set(file2_interfaces.keys())
+    
+    # 파일2에만 있는 인터페이스 ID
+    only_in_file2 = set(file2_interfaces.keys()) - set(file1_interfaces.keys())
+    
+    comparison_results = {
+        'common_interfaces': len(common_interface_ids),
+        'only_in_file1': len(only_in_file1),
+        'only_in_file2': len(only_in_file2),
+        'interface_details': {}
+    }
+    
+    # 각 공통 인터페이스에 대한 상세 비교
+    for interface_id in common_interface_ids:
+        file1_interface = file1_interfaces[interface_id]
+        file2_interface = file2_interfaces[interface_id]
+        
+        # 송신 컬럼 비교 (공백 trim 후)
+        file1_send_cols = set(file1_interface['send_recv_mapping'].keys())
+        file2_send_cols = set(file2_interface['send_recv_mapping'].keys())
+        
+        # 파일1에만 있는 송신 컬럼
+        only_in_file1_cols = file1_send_cols - file2_send_cols
+        
+        # 파일2에만 있는 송신 컬럼
+        only_in_file2_cols = file2_send_cols - file1_send_cols
+        
+        # 공통 송신 컬럼
+        common_send_cols = file1_send_cols & file2_send_cols
+        
+        # 수신 컬럼 비교
+        recv_col_comparison = []
+        for send_col in common_send_cols:
+            file1_recv = file1_interface['send_recv_mapping'][send_col]
+            file2_recv = file2_interface['send_recv_mapping'][send_col]
+            
+            # 수신 컬럼 이름 비교 (trim 후 정확히 일치하는지)
+            is_match = file1_recv.strip() == file2_recv.strip()
+            
+            recv_col_comparison.append({
+                'send_col': send_col,
+                'file1_recv': file1_recv,
+                'file2_recv': file2_recv,
+                'is_match': is_match
+            })
+        
+        # 인터페이스 상세 비교 결과 저장
+        comparison_results['interface_details'][interface_id] = {
+            'interface_name': file1_interface['interface_name'],
+            'only_in_file1_cols': list(only_in_file1_cols),
+            'only_in_file2_cols': list(only_in_file2_cols),
+            'common_cols_count': len(common_send_cols),
+            'recv_col_comparison': recv_col_comparison,
+            'all_recv_cols_match': all(item['is_match'] for item in recv_col_comparison) if recv_col_comparison else False
+        }
+    
+    return comparison_results
+
+def print_comparison_results(comparison_results):
+    """비교 결과를 보기 좋게 출력합니다."""
+    print("\n=== 인터페이스 비교 결과 ===")
+    print(f"공통 인터페이스 수: {comparison_results['common_interfaces']}")
+    print(f"파일1에만 있는 인터페이스 수: {comparison_results['only_in_file1']}")
+    print(f"파일2에만 있는 인터페이스 수: {comparison_results['only_in_file2']}")
+    
+    print("\n=== 인터페이스 상세 비교 ===")
+    for interface_id, details in comparison_results['interface_details'].items():
+        print(f"\n인터페이스 ID: {interface_id}")
+        print(f"인터페이스 이름: {details['interface_name']}")
+        print(f"공통 송신 컬럼 수: {details['common_cols_count']}")
+        print(f"파일1에만 있는 송신 컬럼: {', '.join(details['only_in_file1_cols']) if details['only_in_file1_cols'] else '없음'}")
+        print(f"파일2에만 있는 송신 컬럼: {', '.join(details['only_in_file2_cols']) if details['only_in_file2_cols'] else '없음'}")
+        
+        if details['recv_col_comparison']:
+            print("\n송신 컬럼 | 파일1 수신 컬럼 | 파일2 수신 컬럼 | 일치 여부")
+            print("-" * 60)
+            for comp in details['recv_col_comparison']:
+                match_str = "일치" if comp['is_match'] else "불일치"
+                print(f"{comp['send_col']} | {comp['file1_recv']} | {comp['file2_recv']} | {match_str}")
+        
+        print(f"\n모든 수신 컬럼 일치 여부: {'예' if details['all_recv_cols_match'] else '아니오'}")
+
 # 테스트 코드
 if __name__ == "__main__":
     try:
-        # 예시: input.xlsx 파일 로드
-        input_xlsx_path = 'input.xlsx'
-        wb_input = openpyxl.load_workbook(input_xlsx_path)
-        ws_input = wb_input.active
+        # 두 개의 엑셀 파일 경로
+        input_xlsx_path1 = 'input1.xlsx'
+        input_xlsx_path2 = 'input2.xlsx'
         
-        # 첫 번째 인터페이스 블록 읽기 (B열부터 시작)
-        interface_info = read_interface_block(ws_input, 2)
+        print(f"파일1 '{input_xlsx_path1}'에서 인터페이스 정보 읽는 중...")
+        file1_interfaces = read_all_interfaces(input_xlsx_path1)
+        print(f"파일1에서 {len(file1_interfaces)}개의 인터페이스를 읽었습니다.")
         
-        if interface_info:
-            print(f"인터페이스 이름: {interface_info['interface_name']}")
-            print(f"인터페이스 ID: {interface_info['interface_id']}")
-            print(f"송신 테이블: {interface_info['send']['owner']}.{interface_info['send']['table_name']}")
-            print(f"수신 테이블: {interface_info['recv']['owner']}.{interface_info['recv']['table_name']}")
-            print(f"송신 컬럼 수: {len(interface_info['send']['columns'])}")
-            print(f"수신 컬럼 수: {len(interface_info['recv']['columns'])}")
-        else:
-            print("인터페이스 정보를 읽을 수 없습니다.")
-            
-        wb_input.close()
+        print(f"\n파일2 '{input_xlsx_path2}'에서 인터페이스 정보 읽는 중...")
+        file2_interfaces = read_all_interfaces(input_xlsx_path2)
+        print(f"파일2에서 {len(file2_interfaces)}개의 인터페이스를 읽었습니다.")
+        
+        print("\n두 파일의 인터페이스 비교 중...")
+        comparison_results = compare_interfaces(file1_interfaces, file2_interfaces)
+        
+        # 비교 결과 출력
+        print_comparison_results(comparison_results)
         
     except Exception as e:
-        print(f"오류 발생: {str(e)}")
+        print(f"\n오류 발생: {str(e)}")
