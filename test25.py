@@ -117,9 +117,10 @@ def compare_interfaces(file1_interfaces, file2_interfaces):
     
     comparison_results = {
         'common_interfaces': len(common_interface_ids),
-        'only_in_file1': len(only_in_file1),
-        'only_in_file2': len(only_in_file2),
-        'interface_details': {}
+        'only_in_file1': list(only_in_file1),
+        'only_in_file2': list(only_in_file2),
+        'interface_details': {},
+        'mismatched_interfaces': []  # 불일치하는 인터페이스 목록 추가
     }
     
     # 각 공통 인터페이스에 대한 상세 비교
@@ -142,12 +143,17 @@ def compare_interfaces(file1_interfaces, file2_interfaces):
         
         # 수신 컬럼 비교
         recv_col_comparison = []
+        mismatched_recv_cols = []  # 불일치하는 수신 컬럼 목록 추가
+        
         for send_col in common_send_cols:
             file1_recv = file1_interface['send_recv_mapping'][send_col]
             file2_recv = file2_interface['send_recv_mapping'][send_col]
             
             # 수신 컬럼 이름 비교 (trim 후 정확히 일치하는지)
             is_match = file1_recv.strip() == file2_recv.strip()
+            
+            if not is_match:
+                mismatched_recv_cols.append(send_col)
             
             recv_col_comparison.append({
                 'send_col': send_col,
@@ -157,40 +163,107 @@ def compare_interfaces(file1_interfaces, file2_interfaces):
             })
         
         # 인터페이스 상세 비교 결과 저장
-        comparison_results['interface_details'][interface_id] = {
+        all_cols_match = (len(only_in_file1_cols) == 0 and 
+                         len(only_in_file2_cols) == 0 and 
+                         len(mismatched_recv_cols) == 0)
+        
+        interface_detail = {
             'interface_name': file1_interface['interface_name'],
             'only_in_file1_cols': list(only_in_file1_cols),
             'only_in_file2_cols': list(only_in_file2_cols),
             'common_cols_count': len(common_send_cols),
             'recv_col_comparison': recv_col_comparison,
-            'all_recv_cols_match': all(item['is_match'] for item in recv_col_comparison) if recv_col_comparison else False
+            'mismatched_recv_cols': mismatched_recv_cols,  # 불일치하는 수신 컬럼 목록 추가
+            'all_cols_match': all_cols_match  # 모든 컬럼이 일치하는지 여부
         }
+        
+        comparison_results['interface_details'][interface_id] = interface_detail
+        
+        # 불일치하는 인터페이스가 있으면 목록에 추가
+        if not all_cols_match:
+            comparison_results['mismatched_interfaces'].append(interface_id)
     
     return comparison_results
 
-def print_comparison_results(comparison_results):
+def print_comparison_results(comparison_results, file1_interfaces, file2_interfaces):
     """비교 결과를 보기 좋게 출력합니다."""
-    print("\n=== 인터페이스 비교 결과 ===")
+    print("\n=== 인터페이스 비교 결과 요약 ===")
     print(f"공통 인터페이스 수: {comparison_results['common_interfaces']}")
-    print(f"파일1에만 있는 인터페이스 수: {comparison_results['only_in_file1']}")
-    print(f"파일2에만 있는 인터페이스 수: {comparison_results['only_in_file2']}")
+    print(f"파일1에만 있는 인터페이스 수: {len(comparison_results['only_in_file1'])}")
+    print(f"파일2에만 있는 인터페이스 수: {len(comparison_results['only_in_file2'])}")
+    
+    # 불일치하는 인터페이스 정보 추가
+    mismatched_count = len(comparison_results['mismatched_interfaces'])
+    print(f"불일치하는 인터페이스 수: {mismatched_count}")
+    
+    if mismatched_count > 0:
+        print("\n[불일치하는 인터페이스 목록]")
+        for idx, interface_id in enumerate(comparison_results['mismatched_interfaces']):
+            interface_name = comparison_results['interface_details'][interface_id]['interface_name']
+            print(f"{idx+1}. {interface_id} ({interface_name})")
+            
+            # 불일치 상세 정보 요약
+            detail = comparison_results['interface_details'][interface_id]
+            if detail['only_in_file1_cols']:
+                print(f"   - 파일1에만 있는 송신 컬럼: {len(detail['only_in_file1_cols'])}개")
+            if detail['only_in_file2_cols']:
+                print(f"   - 파일2에만 있는 송신 컬럼: {len(detail['only_in_file2_cols'])}개")
+            if detail['mismatched_recv_cols']:
+                print(f"   - 수신 컬럼 불일치: {len(detail['mismatched_recv_cols'])}개")
+    
+    # 파일1에만 있는 인터페이스 목록
+    if comparison_results['only_in_file1']:
+        print("\n[파일1에만 있는 인터페이스 목록]")
+        for idx, interface_id in enumerate(comparison_results['only_in_file1']):
+            interface_name = file1_interfaces[interface_id]['interface_name']
+            print(f"{idx+1}. {interface_id} ({interface_name})")
+    
+    # 파일2에만 있는 인터페이스 목록
+    if comparison_results['only_in_file2']:
+        print("\n[파일2에만 있는 인터페이스 목록]")
+        for idx, interface_id in enumerate(comparison_results['only_in_file2']):
+            interface_name = file2_interfaces[interface_id]['interface_name']
+            print(f"{idx+1}. {interface_id} ({interface_name})")
     
     print("\n=== 인터페이스 상세 비교 ===")
     for interface_id, details in comparison_results['interface_details'].items():
         print(f"\n인터페이스 ID: {interface_id}")
         print(f"인터페이스 이름: {details['interface_name']}")
         print(f"공통 송신 컬럼 수: {details['common_cols_count']}")
-        print(f"파일1에만 있는 송신 컬럼: {', '.join(details['only_in_file1_cols']) if details['only_in_file1_cols'] else '없음'}")
-        print(f"파일2에만 있는 송신 컬럼: {', '.join(details['only_in_file2_cols']) if details['only_in_file2_cols'] else '없음'}")
         
+        # 파일1에만 있는 송신 컬럼
+        if details['only_in_file1_cols']:
+            print(f"파일1에만 있는 송신 컬럼 ({len(details['only_in_file1_cols'])}개): {', '.join(details['only_in_file1_cols'])}")
+        else:
+            print("파일1에만 있는 송신 컬럼: 없음")
+        
+        # 파일2에만 있는 송신 컬럼
+        if details['only_in_file2_cols']:
+            print(f"파일2에만 있는 송신 컬럼 ({len(details['only_in_file2_cols'])}개): {', '.join(details['only_in_file2_cols'])}")
+        else:
+            print("파일2에만 있는 송신 컬럼: 없음")
+        
+        # 수신 컬럼 비교 표시
         if details['recv_col_comparison']:
-            print("\n송신 컬럼 | 파일1 수신 컬럼 | 파일2 수신 컬럼 | 일치 여부")
-            print("-" * 60)
+            print("\n[송신-수신 컬럼 매핑 비교]")
+            print("송신 컬럼 | 파일1 수신 컬럼 | 파일2 수신 컬럼 | 일치 여부")
+            print("-" * 70)
+            
+            # 불일치하는 항목 먼저 표시
             for comp in details['recv_col_comparison']:
-                match_str = "일치" if comp['is_match'] else "불일치"
-                print(f"{comp['send_col']} | {comp['file1_recv']} | {comp['file2_recv']} | {match_str}")
+                if not comp['is_match']:
+                    match_str = "불일치 ❌"
+                    print(f"{comp['send_col']} | {comp['file1_recv']} | {comp['file2_recv']} | {match_str}")
+            
+            # 일치하는 항목 표시
+            for comp in details['recv_col_comparison']:
+                if comp['is_match']:
+                    match_str = "일치 ✓"
+                    print(f"{comp['send_col']} | {comp['file1_recv']} | {comp['file2_recv']} | {match_str}")
         
-        print(f"\n모든 수신 컬럼 일치 여부: {'예' if details['all_recv_cols_match'] else '아니오'}")
+        # 전체 일치 여부 표시
+        match_status = "모든 컬럼 일치 ✓" if details['all_cols_match'] else "불일치 항목 있음 ❌"
+        print(f"\n[결과] {match_status}")
 
 # 테스트 코드
 if __name__ == "__main__":
@@ -211,7 +284,10 @@ if __name__ == "__main__":
         comparison_results = compare_interfaces(file1_interfaces, file2_interfaces)
         
         # 비교 결과 출력
-        print_comparison_results(comparison_results)
+        if comparison_results is not None:
+            print_comparison_results(comparison_results, file1_interfaces, file2_interfaces)
+        else:
+            print("비교 결과가 없습니다.")
         
     except Exception as e:
         print(f"\n오류 발생: {str(e)}")
